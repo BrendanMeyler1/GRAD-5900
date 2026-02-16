@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Agent</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>Excel Agent</h1>
+                <div id="model-indicator" class="model-badge hidden">
+                    <span class="dot"></span>
+                    <span id="model-name">Fast Model</span>
+                </div>
+            </div>
+        </header>
+
+        <main id="chat-container">
+            <div class="message system">
+                <div class="bubble">
+                    Hello! I'm your Excel Assistant. Ask me for formulas or to analyze data.
+                </div>
+            </div>
+        </main>
+
+        <div class="input-area">
+            <form id="chat-form">
+                <input type="text" id="user-input" placeholder="Ask about Excel..." autocomplete="off">
+                <button type="submit">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
