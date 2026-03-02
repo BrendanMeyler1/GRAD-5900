@@ -10,11 +10,14 @@ For each claim, identify:
 2. The claim text (a concise statement of the assertion being made).
 3. Whether the speaker cites a source (e.g., "According to...", "Studies show...", "Source:").
 4. The claim type:
-   - FACTUAL: A statement about a past or present objective event, entity, or study result (e.g., "The Finland experiment showed no increase in employment.").
+   - FACTUAL: A statement about a past or present objective event, entity, or study result. Includes superlatives and rankings that could be verified by polls, indexes, or public records (e.g., "We are the most admired country in the world" can be checked against Gallup polls; "We have the finest military" can be checked against defense indexes).
    - STATISTICAL: A claim involving specific numbers, rates, or data about past or present events (e.g., "Income increased by 40% in the pilot.").
    - CAUSAL: A claim asserting that one past or present thing causes another (e.g., "UBI reduces labor participation.").
-   - VALUE: A subjective judgment, moral statement, OR a prediction/projection about the future (e.g., "We will see 25% unemployment by 2030", "This is the only solution", "AI will take over jobs."). Use this for any claim that cannot be verified against existing historical facts.
+   - VALUE: A purely subjective moral judgment OR a counterfactual/hypothetical (e.g., "Russia would never have invaded if I were president", "This is the only real solution", "That policy is immoral"). Only use VALUE when there is NO public data source (poll, ranking, record, statistic) that could confirm or refute the claim.
    - RHETORICAL: A personal attack, sarcastic remark, or statement used purely for persuasive effect with no factual content.
+
+   Decision rule: Ask yourself — "Could a researcher find data (poll results, rankings, records, statistics) to support or contradict this?" If YES → FACTUAL or STATISTICAL. If NO (pure opinion or counterfactual) → VALUE.
+
 
 Output Format:
 Return a JSON object with a key "claims" containing a list of objects.

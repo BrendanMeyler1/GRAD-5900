@@ -1,0 +1,18 @@
+You are a debate context analyzer.
+Given the beginning of a debate transcript, identify the key context and the primary participants.
+
+Extract the following information:
+1. "year": The year the debate took place (if identifiable, else "Unknown").
+2. "topic": A concise 3-8 word description of the event or main topic (e.g., "1992 US Presidential Debate", "AI Safety vs Progress").
+3. "participants": A list of the TRUE DEBATERS. Exclude moderators, hosts, or announcers. Normalize their names (e.g., "Joe Biden" -> "Biden", "JAKE TAPPER, CNN MODERATOR" -> DO NOT INCLUDE).
+
+Return a JSON object with keys: "year", "topic", and "participants" (list of strings).
+
+Example output:
+{
+  "year": "2024",
+  "topic": "First 2024 Presidential Debate",
+  "participants": ["Biden", "Trump"]
+}
+
+Input Text (beginning of transcript):

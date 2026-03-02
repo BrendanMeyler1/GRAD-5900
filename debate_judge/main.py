@@ -88,10 +88,45 @@ def main():
         print(Fore.YELLOW + "No text provided. Exiting.")
         return
 
+    # ── Stage 0: Context Extraction ─────────────────────────────────────────
+    print(Fore.CYAN + "\n--- Executing Stage 0: Context Extraction ---")
+    debate_context = extractor.extract_context(debate_text)
+    
+    print(Fore.GREEN + f"Detected Year:  {debate_context.get('year')}")
+    print(Fore.GREEN + f"Detected Topic: {debate_context.get('topic')}")
+    
+    detected_participants = debate_context.get("participants", [])
+    print(Fore.YELLOW + f"Detected Participants: {', '.join(detected_participants) if detected_participants else 'None'}")
+    
+    print("\nPress Enter to confirm these participants, or type a comma-separated list of the correct debaters:")
+    user_input = input("Choice: ").strip()
+    if user_input:
+        confirmed_participants = [p.strip() for p in user_input.split(",") if p.strip()]
+        print(Fore.GREEN + f"Updated Participants: {', '.join(confirmed_participants)}")
+    else:
+        confirmed_participants = detected_participants
+        print(Fore.GREEN + "Participants confirmed.")
+        
+    # Create a normalized set of valid participants for rigorous filtering.
+    # We use scorer._normalize_speaker to ensure the matching logic is consistent.
+    valid_participants = set()
+    for p in confirmed_participants:
+        norm = scorer._normalize_speaker(p)
+        if norm:
+            valid_participants.add(norm)
+
     # ── Stage 1: Extraction ─────────────────────────────────────────────────
     print(Fore.CYAN + "\n--- Executing Stage 1: Extraction ---")
-    claims = extractor.extract_claims(debate_text)
-    print(f"Extracted {len(claims)} claims.")
+    raw_claims = extractor.extract_claims(debate_text)
+    
+    # Filter out claims from non-participants (moderators, audience, etc.)
+    claims = []
+    for claim in raw_claims:
+        norm = scorer._normalize_speaker(claim.get("speaker"))
+        if norm in valid_participants:
+            claims.append(claim)
+            
+    print(f"Extracted {len(raw_claims)} total claims. Kept {len(claims)} from confirmed participants.")
 
     # ── Stage 2: Verification ───────────────────────────────────────────────
     verified_claims = []
@@ -103,7 +138,7 @@ def main():
         if router.should_verify(claim):
             model = router.select_model(claim)
             print(Fore.YELLOW + f"  -> Verifying (Type: {claim.get('type')} | Model: {model})")
-            result = verifier.verify_claim(claim)
+            result = verifier.verify_claim(claim, debate_context=debate_context)
 
             claim["verification_status"] = result["status"]
             claim["verification_reason"] = result["reasoning"]
@@ -120,12 +155,19 @@ def main():
 
     # ── Stage 3: Fallacy Detection ───────────────────────────────────────────
     print(Fore.CYAN + "\n--- Executing Stage 3: Fallacy Detection ---")
-    fallacies = fallacy_detector.detect_fallacies(debate_text)
+    raw_fallacies = fallacy_detector.detect_fallacies(debate_text)
+    
+    fallacies = []
+    for f in raw_fallacies:
+        norm = scorer._normalize_speaker(f.get("speaker"))
+        if norm in valid_participants:
+            fallacies.append(f)
+            
     if fallacies:
         for f in fallacies:
             print(Fore.RED + f"Detected {f.get('fallacy_name')} by {f.get('speaker')}: {f.get('quote')}")
     else:
-        print(Fore.GREEN + "No fallacies detected.")
+        print(Fore.GREEN + "No fallacies detected by confirmed participants.")
 
     # ── Stage 4: Scoring ─────────────────────────────────────────────────────
     print(Fore.CYAN + "\n--- Executing Stage 4: Scoring ---")

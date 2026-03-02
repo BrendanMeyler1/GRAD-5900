@@ -1,4 +1,13 @@
+import warnings
 import wikipedia
+
+# Suppress the BeautifulSoup parser warning emitted by the wikipedia library
+# internally — we have no way to pass 'features' to its BeautifulSoup call.
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*No parser was explicitly specified.*"
+)
 
 class WikipediaTool:
     def __init__(self):

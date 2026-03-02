@@ -27,19 +27,21 @@ The system deliberately separates responsibilities:
 
 ```
                  User Debate
-                      │
-                      ▼
+                 (URL or Text)
+                       │
+                       ▼
           ┌────────────────────────┐
-          │  Speaker Segmentation  │
+          │   Stage 0: Context     │
+          │   (Year, Topic, Devs)  │
           └────────────────────────┘
-                      │
-                      ▼
+                       │
+                       ▼
           ┌────────────────────────┐
-          │    Claim Extraction    │
+          │  Stage 1: Extraction   │
           │   (Structured JSON)    │
           └────────────────────────┘
-                      │
-                      ▼
+                       │
+                       ▼
           ┌────────────────────────┐
           │  Claim Type Classifier │
           └────────────────────────┘
@@ -96,11 +98,11 @@ The system deliberately separates responsibilities:
 
 The debate is converted into structured reasoning units and evaluated step-by-step.
 
-### 1. Speaker Segmentation
-Splits dialogue into individual speaker messages.
+### 0. Context Extraction & Filtering
+Examines the beginning of the text to identify the **Year**, **Topic**, and **True Participants**. The user confirms the participants to automatically filter out moderators and audience members from scoring.
 
-### 2. Claim Extraction
-Converts text into atomic claims, each tagged with a type:
+### 1. Claim Extraction
+Converts the full text into atomic claims, each tagged with a type:
 
 | Type | Description |
 |------|-------------|
@@ -115,16 +117,18 @@ Converts text into atomic claims, each tagged with a type:
 `CAUSAL` and `STATISTICAL` claims use the stronger `gpt-4o` model.  
 `VALUE` and `RHETORICAL` claims are skipped entirely.
 
-### 4. Evidence Retrieval
-Verifiable claims are checked against neutral reference material using the Wikipedia API.
+### 3. Evidence Retrieval & Smart Routing
+Verifiable claims are verified via web searches.
+- `FACTUAL` / `CAUSAL` claims -> Searched on **Wikipedia** first, fallback to DuckDuckGo.
+- `STATISTICAL` claims -> Searched on **DuckDuckGo** first (better for specific numbers).
 
-### 5. Claim Verification
+### 4. Claim Verification
 Each claim is classified as:
 - `SUPPORTED` — Evidence broadly consistent with the claim
 - `CONTRADICTED` — Evidence explicitly opposes the claim
 - `INSUFFICIENT` — Evidence is off-topic or not found
 
-### 6. Fallacy Detection
+### 5. Fallacy Detection
 The system checks for:
 - **Ad Hominem** — Attacking the person, not the argument
 - **Strawman** — Misrepresenting the opponent's argument
@@ -132,10 +136,10 @@ The system checks for:
 - **Hasty Generalization** — Broad claim from insufficient evidence
 - **Moving Goalposts** — Changing criteria mid-debate
 
-### 7. Deterministic Scoring
-Python code calculates argument strength — no LLM involved.
+### 6. Deterministic Scoring
+Python code calculates argument strength for confirmed participants only — no LLM involved.
 
-### 8. Explanation Generation
+### 7. Explanation Generation
 The LLM produces a grounded explanation using the structured results.
 
 ---
@@ -186,16 +190,19 @@ Speaker B supported their claims with verifiable evidence.
 debate_judge/
 │
 ├── main.py              # Entry point — orchestrates the full pipeline
-├── extractor.py         # Stage 1: Claim extraction
+├── extractor.py         # Stage 0/1: Context and Claim extraction
 ├── verifier.py          # Stage 2: Evidence-based claim verification
 ├── fallacy.py           # Stage 3: Logical fallacy detection
 ├── scoring.py           # Stage 4: Deterministic scoring (no LLM)
 ├── router.py            # Complexity routing and model selection
 │
 ├── tools/
-│   └── wikipedia_tool.py  # Wikipedia evidence retrieval
+│   ├── wikipedia_tool.py  # Wikipedia evidence retrieval
+│   ├── duckduckgo_tool.py # DuckDuckGo web search fallback
+│   └── web_scraper.py     # Debate URL text extraction (Reddit, URLs)
 │
 ├── prompts/
+│   ├── context.txt      # System prompt for context extraction
 │   ├── extract.txt      # System prompt for claim extraction
 │   ├── verify.txt       # System prompt for claim verification
 │   └── fallacy.txt      # System prompt for fallacy detection
@@ -245,14 +252,18 @@ OPENAI_API_KEY=your_api_key_here
 python main.py
 ```
 
-Paste a debate transcript when prompted, then press **Enter twice** to submit.
+When prompted, you can either:
+1. **Submit a URL** (e.g., a CNN transcript, Reddit debate thread). The scraper will automatically extract the text.
+2. **Paste a transcript** manually, then press **Enter twice** to submit.
 
-**Example input:**
+**Example text input:**
 ```
 A: Crime has increased every year.
 B: FBI statistics show crime decreased in 2022.
 A: Those statistics are unreliable and you clearly don't understand economics.
 ```
+
+The system will detect the participants, ask for your confirmation, and then run the full pipeline.
 
 **Running tests (no API key required):**
 ```bash
@@ -263,11 +274,10 @@ python -m pytest test_debate_judge.py -v
 
 ## Limitations
 
-- Wikipedia summaries may be incomplete or outdated
-- Philosophical and future-tense claims cannot be externally verified
-- Fallacy detection is heuristic and may miss subtle cases
-- Scoring weights are manually chosen and fixed
-- Wikipedia is the only evidence source (no news, academic databases, etc.)
+- Wikipedia summaries and DuckDuckGo snippets may be incomplete or lack deep context.
+- Philosophical and future-tense claims cannot be externally verified.
+- Fallacy detection is heuristic and may miss subtle cases.
+- Scoring weights are manually chosen and fixed.
 
 > This is a research prototype, not a truth engine.
 

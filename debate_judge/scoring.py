@@ -13,19 +13,21 @@ class Scorer:
         Calculates the score for each speaker.
         claims_data: List of verified claims.
         fallacies_data: List of fallacies with speaker attribution.
-        
-        Note: fallacies_data handling requires mapping fallacies to speakers.
-        The current fallacy detector might need to return speaker info or we associate it by segment.
-        Assuming 'fallacies_data' is a dict {speaker: [fallacy list]}.
-        Or simpler: we just subtract 3 for every fallacy found in a speaker's segment.
+
+        Speaker names are normalized before aggregation so that
+        capitalization variants (BIDEN / Biden) and role suffixes
+        (JAKE TAPPER, CNN MODERATOR) are handled consistently.
+        Moderators are excluded from scoring entirely.
         """
-        
+
         speaker_scores = {}
         speaker_details = {}
 
         # Process Claims
         for claim in claims_data:
-            speaker = claim.get("speaker")
+            speaker = self._normalize_speaker(claim.get("speaker"))
+            if speaker is None:
+                continue
             if speaker not in speaker_scores:
                 speaker_scores[speaker] = 0
                 speaker_details[speaker] = {
@@ -56,7 +58,9 @@ class Scorer:
         # Process Fallacies
         # Expected input: list of objects { "speaker": "A", "fallacy": "Ad Hominem" }
         for fallacy in fallacies_data:
-            speaker = fallacy.get("speaker")
+            speaker = self._normalize_speaker(fallacy.get("speaker"))
+            if speaker is None:
+                continue
             if speaker not in speaker_scores:
                 speaker_scores[speaker] = 0
                 speaker_details[speaker] = {
@@ -74,3 +78,42 @@ class Scorer:
             "scores": speaker_scores,
             "details": speaker_details
         }
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    # Known moderator keywords — any normalized name containing one of these
+    # will be excluded from scoring.
+    _MODERATOR_KEYWORDS = {
+        "tapper", "bash", "moderator", "host", "anchor", "cnn"
+    }
+
+    def _normalize_speaker(self, raw: str | None) -> str | None:
+        """
+        Normalize a raw speaker label to a clean, consistent key:
+          - Strips role suffixes like ", CNN MODERATOR"
+          - Converts to Title Case
+          - Reduces multi-word names to last name only
+            so "Joe Biden" == "Biden" == "BIDEN"
+          - Returns None if the speaker is a moderator (excluded from scoring)
+        """
+        if not raw:
+            return None
+
+        # Strip everything after the first comma (e.g. "JAKE TAPPER, CNN MODERATOR")
+        name = raw.split(",")[0].strip()
+
+        # Title-case for consistent comparison
+        name = name.title()
+
+        # Reduce to last name so "Joe Biden" merges with "Biden"
+        parts = name.split()
+        if len(parts) > 1:
+            name = parts[-1]
+
+        # Check against moderator keywords (case-insensitive)
+        name_lower = name.lower()
+        if any(kw in name_lower for kw in self._MODERATOR_KEYWORDS):
+            return None
+
+        return name
+
