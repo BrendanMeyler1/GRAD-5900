@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+
+# Compiled / binary artifacts
+a.out
+*.o
+*.a
+*.so
+*.dll
+
+# Debug / scratch files
+debug_env.py
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
