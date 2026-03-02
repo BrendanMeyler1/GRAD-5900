@@ -123,10 +123,18 @@ def main():
     claims = []
     for claim in raw_claims:
         norm = scorer._normalize_speaker(claim.get("speaker"))
-        if norm in valid_participants:
-            claims.append(claim)
-            
-    print(f"Extracted {len(raw_claims)} total claims. Kept {len(claims)} from confirmed participants.")
+        if valid_participants:
+            if norm in valid_participants:
+                claims.append(claim)
+        else:
+            # If no participants were confirmed, allow all non-moderators
+            if norm:
+                claims.append(claim)
+                
+    if valid_participants:
+        print(f"Extracted {len(raw_claims)} total claims. Kept {len(claims)} from confirmed participants.")
+    else:
+        print(f"Extracted {len(raw_claims)} total claims. Kept {len(claims)} non-moderator claims (no specific participants filtered).")
 
     # ── Stage 2: Verification ───────────────────────────────────────────────
     verified_claims = []
@@ -160,8 +168,12 @@ def main():
     fallacies = []
     for f in raw_fallacies:
         norm = scorer._normalize_speaker(f.get("speaker"))
-        if norm in valid_participants:
-            fallacies.append(f)
+        if valid_participants:
+            if norm in valid_participants:
+                fallacies.append(f)
+        else:
+            if norm:
+                fallacies.append(f)
             
     if fallacies:
         for f in fallacies:
@@ -195,13 +207,19 @@ def main():
     else:
         sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         top_score = sorted_scores[0][1]
-        leaders = [spk for spk, sc in sorted_scores if sc == top_score]
 
-        if len(leaders) > 1:
-            print(Fore.YELLOW + f"\nResult: TIE between {', '.join(leaders)} ({top_score} pts each)")
+        if top_score <= 0:
+            print(Fore.YELLOW + f"\nResult: NO CLEAR WINNER (Highest score was {top_score}, indicating poor argument quality across the board)")
+            winner = "No Clear Winner (All scores <= 0)"
         else:
-            winner = leaders[0]
-            print(Fore.GREEN + f"\nWinner: {winner}")
+            leaders = [spk for spk, sc in sorted_scores if sc == top_score]
+
+            if len(leaders) > 1:
+                print(Fore.YELLOW + f"\nResult: TIE between {', '.join(leaders)} ({top_score} pts each)")
+                winner = "Tie"
+            else:
+                winner = leaders[0]
+                print(Fore.GREEN + f"\nWinner: {winner}")
 
     # ── Stage 5: LLM Explanation ─────────────────────────────────────────────
     print(Fore.CYAN + "\n--- Generating Explanation ---")

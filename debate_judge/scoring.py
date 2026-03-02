@@ -84,7 +84,7 @@ class Scorer:
     # Known moderator keywords — any normalized name containing one of these
     # will be excluded from scoring.
     _MODERATOR_KEYWORDS = {
-        "tapper", "bash", "moderator", "host", "anchor", "cnn"
+        "tapper", "bash", "moderator", "host", "anchor", "cnn", "automoderator"
     }
 
     def _normalize_speaker(self, raw: str | None) -> str | None:
@@ -99,16 +99,25 @@ class Scorer:
         if not raw:
             return None
 
-        # Strip everything after the first comma (e.g. "JAKE TAPPER, CNN MODERATOR")
-        name = raw.split(",")[0].strip()
+        # Strip leading u/ commonly found in Reddit usernames
+        name = raw.strip()
+        if name.lower().startswith("u/"):
+            name = name[2:]
 
-        # Title-case for consistent comparison
-        name = name.title()
+        # Strip everything after the first comma (e.g. "JAKE TAPPER, CNN MODERATOR")
+        name = name.split(",")[0].strip()
 
         # Reduce to last name so "Joe Biden" merges with "Biden"
         parts = name.split()
         if len(parts) > 1:
             name = parts[-1]
+
+        # Smart casing: If ALL CAPS or all lower, convert to Title Case.
+        # Otherwise, preserve internal casing (e.g., camelCase for Reddit) but capitalize first letter.
+        if name.isupper() or name.islower():
+            name = name.title()
+        elif name:
+            name = name[0].upper() + name[1:]
 
         # Check against moderator keywords (case-insensitive)
         name_lower = name.lower()

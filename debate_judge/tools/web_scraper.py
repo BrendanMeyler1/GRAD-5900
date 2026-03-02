@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 _REDDIT_RE = re.compile(r"reddit\.com/r/\w+/comments/\w+", re.IGNORECASE)
 
 # Max characters per comment to keep token usage manageable
-_MAX_COMMENT_CHARS = 800
+_MAX_COMMENT_CHARS = 1000
 
 # Cap on total comments extracted
 _MAX_COMMENTS = 60
@@ -74,21 +74,70 @@ class WebScraper:
 
         lines = [f"[Post Title]: {title}"]
         if selftext and selftext not in ("[deleted]", "[removed]"):
-            lines.append(f"u/{op_author}: {selftext[:_MAX_COMMENT_CHARS]}")
+            # Allow much more context for the Origin Post (4000 chars)
+            lines.append(f"[Original Post Context]\nu/{op_author}: {selftext[:4000]}\n")
 
-        comment_count = [0]  # mutable counter for the recursive helper
-        self._walk_reddit_comments(
-            data[1]["data"]["children"],
-            lines,
-            depth=0,
-            max_depth=4,
-            counter=comment_count
-        )
+        # 1. Score all top-level comment threads by depth/descendants
+        top_level_comments = data[1]["data"]["children"]
+        scored_threads = []
+        
+        for idx, child in enumerate(top_level_comments):
+            if child.get("kind") != "t1":
+                continue
+            depth, descendants = self._score_comment_tree(child, 0)
+            # A good debate is deep, but also has multiple replies (descendants)
+            score = (depth * 2) + descendants
+            scored_threads.append((score, depth, descendants, child))
+            
+        # 2. Sort threads by score descending to find the "Most Notable Debates"
+        scored_threads.sort(key=lambda x: x[0], reverse=True)
+        
+        # 3. Walk the best threads until we hit our comment cap
+        comment_count = [0]
+        for score, depth, desc, child in scored_threads:
+            if comment_count[0] >= _MAX_COMMENTS:
+                break
+            
+            lines.append(f"\n--- [Notable Debate Thread: Depth {depth}, Replies {desc}] ---")
+            
+            # Walk this specific high-value thread
+            self._walk_reddit_comments(
+                [child],
+                lines,
+                depth=0,
+                max_depth=6, # Allow deeper trees for notable debates
+                counter=comment_count
+            )
 
-        if not lines:
+        if len(lines) <= 1: # Only title was added
             raise ValueError("No readable content found in this Reddit thread.")
 
-        return "\n\n".join(lines)
+        return "\n".join(lines)
+
+    def _score_comment_tree(self, child: dict, current_depth: int) -> tuple[int, int]:
+        """
+        Recursively scores a comment tree to find the most active debates.
+        Returns (max_depth, total_descendants).
+        """
+        if child.get("kind") != "t1":
+            return current_depth, 0
+            
+        comment = child["data"]
+        replies = comment.get("replies", "")
+        
+        if not isinstance(replies, dict):
+            return current_depth, 0
+            
+        reply_children = replies["data"]["children"]
+        max_child_depth = current_depth
+        total_descendants = len(reply_children)
+        
+        for reply in reply_children:
+            child_depth, child_desc = self._score_comment_tree(reply, current_depth + 1)
+            max_child_depth = max(max_child_depth, child_depth)
+            total_descendants += child_desc
+            
+        return max_child_depth, total_descendants
 
     def _walk_reddit_comments(self, children, lines, depth, max_depth, counter):
         """Recursively walk Reddit comment tree, respecting depth + count caps."""

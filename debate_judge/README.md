@@ -154,7 +154,8 @@ The LLM produces a grounded explanation using the structured results.
 | Contradicted claim | **−2** |
 | Logical fallacy | **−3** |
 
-The winner is selected purely by score. The model only explains the result afterward.
+The winner is selected purely by score. The model only explains the result afterward.  
+*Note: A speaker must achieve a score **> 0** to win. If all scores are 0 or below, the result is declared "No Clear Winner".*
 
 ---
 

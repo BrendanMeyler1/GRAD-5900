@@ -114,7 +114,7 @@ class ClaimExtractor:
             f"Details: {json.dumps(details)}\n\n"
             f"Claims Analysis:\n{json.dumps(verified_claims)}\n\n"
             f"Fallacies:\n{json.dumps(fallacies)}\n\n"
-            f"Winner: {f'Speaker {winner}' if winner else 'Tie'}"
+            f"Winner: {winner if winner else 'Tie'}\n\n"
         )
         try:
             response = self.client.chat.completions.create(

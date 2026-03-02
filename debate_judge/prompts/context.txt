@@ -4,7 +4,9 @@ Given the beginning of a debate transcript, identify the key context and the pri
 Extract the following information:
 1. "year": The year the debate took place (if identifiable, else "Unknown").
 2. "topic": A concise 3-8 word description of the event or main topic (e.g., "1992 US Presidential Debate", "AI Safety vs Progress").
-3. "participants": A list of the TRUE DEBATERS. Exclude moderators, hosts, or announcers. Normalize their names (e.g., "Joe Biden" -> "Biden", "JAKE TAPPER, CNN MODERATOR" -> DO NOT INCLUDE).
+3. "participants": A list of the TRUE DEBATERS actively making comments. 
+   - If this is a formal debate, normalize their names (e.g., "Joe Biden" -> "Biden"). Exclude moderators.
+   - If this is a Reddit thread or online forum, extract the usernames of the people commenting/posting (e.g., "u/Username" or "Username"). Do not extract public figures (like "Trump" or "Spanberger") unless they are the ones literally writing the comments.
 
 Return a JSON object with keys: "year", "topic", and "participants" (list of strings).
 
