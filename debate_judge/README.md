@@ -159,7 +159,35 @@ The winner is selected purely by score. The model only explains the result after
 
 ---
 
-## Example Output
+## Usage & Screenshots
+
+Run the program from the `debate_judge/` directory:
+
+```bash
+python main.py
+```
+
+### Step 1 — Startup & Input Method
+
+On launch, the system initializes all components and prompts you to choose how to provide the debate: via a URL or by pasting text directly.
+
+![Startup screen showing Debate Judge initializing and prompting for input method](docs/screenshot_startup.png)
+
+### Step 2 — Pipeline Execution
+
+After pasting the transcript and confirming participants, the system runs through all stages: context extraction, claim extraction, verification routing, and fallacy detection. `VALUE` and `RHETORICAL` claims are automatically skipped during verification.
+
+![Pipeline stages executing — showing context extraction, claim extraction, verification, and fallacy detection](docs/screenshot_pipeline.png)
+
+### Step 3 — Final Judgment & Explanation
+
+The scoring stage tallies points per participant. If no speaker achieves a score above 0 (e.g., all claims were subjective and unverifiable), the system declares **No Clear Winner**. A grounded LLM explanation is generated based solely on the structured results.
+
+![Final judgment showing scores, result declaration, and LLM-generated explanation](docs/screenshot_results.png)
+
+---
+
+## Example Output (Factual Debate)
 
 ```
 Speaker A: -7 points
@@ -270,6 +298,34 @@ The system will detect the participants, ask for your confirmation, and then run
 ```bash
 python -m pytest test_debate_judge.py -v
 ```
+
+---
+
+## Troubleshooting
+
+### `ModuleNotFoundError: No module named 'ddgs'`
+
+This error occurs with `duckduckgo-search` **v6+**, which changed its internal package name. The import in `tools/duckduckgo_tool.py` was updated from:
+
+```python
+# Old (broken with duckduckgo-search >= 6.0)
+from ddgs import DDGS
+```
+
+to:
+
+```python
+# Correct import for duckduckgo-search >= 6.0
+from duckduckgo_search import DDGS
+```
+
+If you encounter this error after a fresh install, ensure you are using the version pinned in `requirements.txt`:
+
+```
+duckduckgo-search>=6.0.0
+```
+
+And that the import in `tools/duckduckgo_tool.py` uses `from duckduckgo_search import DDGS`.
 
 ---
 

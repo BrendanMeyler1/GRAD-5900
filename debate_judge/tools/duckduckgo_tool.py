@@ -10,7 +10,7 @@ combined text block the LLM can reason over.
 No API key required.
 """
 
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 
 class DuckDuckGoTool:
