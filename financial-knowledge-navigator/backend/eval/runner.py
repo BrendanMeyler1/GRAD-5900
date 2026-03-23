@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -11,16 +11,19 @@ from backend.eval.metrics import (
     answer_length_score,
     average_scores,
 )
+from backend.eval.base import DatasetEvaluator
 
 
-class EvaluationRunner:
+class EvaluationRunner(DatasetEvaluator):
     def __init__(
         self,
         query_pipeline,
         llm_judge,
+        ragas_runner=None,
     ):
         self.query_pipeline = query_pipeline
         self.llm_judge = llm_judge
+        self.ragas_runner = ragas_runner
 
     def _run_single_mode(self, item: Dict, mode: str, indexed_docs: List[str], top_k: int = 5) -> Dict[str, Any]:
         question = item["question"]
@@ -74,6 +77,18 @@ class EvaluationRunner:
             use_cache=True,
         )
 
+        ragas_result = None
+        if self.ragas_runner is not None:
+            ragas_result = self.ragas_runner.score_answer(
+                question=question,
+                ideal_answer=ideal_answer,
+                retrieved_context=retrieved_context_text,
+                graph_context=graph_context_for_mode,
+                candidate_answer=final_answer,
+                expected_sources=expected_sources,
+                retrieved_sources=retrieved_sources,
+            )
+
         llm_scores = judge_result["scores"]
         llm_overall_normalized = llm_scores["overall"] / 5.0
         combined_overall = (heuristic_overall + llm_overall_normalized) / 2.0
@@ -91,6 +106,7 @@ class EvaluationRunner:
             "heuristic_scores": heuristic_scores,
             "heuristic_overall": heuristic_overall,
             "llm_judge": judge_result,
+            "ragas": ragas_result,
             "combined_overall": combined_overall,
         }
 
@@ -102,7 +118,7 @@ class EvaluationRunner:
         top_k: int = 5,
     ) -> Dict[str, Any]:
         if modes is None:
-            modes = ["vector", "hybrid", "graphrag"]
+            modes = self.query_pipeline.supported_modes()
 
         results_by_mode = {mode: [] for mode in modes}
 
@@ -139,18 +155,37 @@ class EvaluationRunner:
                     r["llm_judge"]["scores"][metric_name] for r in results
                 ) / len(results)
 
+            ragas_results = [r["ragas"] for r in results if r.get("ragas")]
+            avg_ragas_metrics = {}
+            avg_ragas_overall = 0.0
+            ragas_backend = None
+            if ragas_results:
+                ragas_backend = ragas_results[0].get("backend")
+                avg_ragas_overall = sum(
+                    r["scores"].get("overall", 0.0) for r in ragas_results
+                ) / len(ragas_results)
+                for metric_name in ragas_results[0]["scores"].keys():
+                    if metric_name == "overall":
+                        continue
+                    avg_ragas_metrics[metric_name] = sum(
+                        r["scores"][metric_name] for r in ragas_results
+                    ) / len(ragas_results)
+
             summary[mode] = {
                 "average_combined_overall": avg_combined,
                 "average_heuristic_overall": avg_heuristic,
                 "average_llm_overall_0_to_5": avg_llm_overall,
                 "average_heuristic_metrics": avg_heuristic_metrics,
                 "average_llm_metrics": avg_llm_metrics,
+                "average_ragas_overall": avg_ragas_overall,
+                "average_ragas_metrics": avg_ragas_metrics,
+                "ragas_backend": ragas_backend,
                 "num_questions": len(results),
                 "cache_hits": cache_hits,
             }
 
         return {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "summary": summary,
             "results_by_mode": results_by_mode,
         }
@@ -160,7 +195,7 @@ class EvaluationRunner:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         file_path = output_path / f"evaluation_{timestamp}.json"
 
         with open(file_path, "w", encoding="utf-8") as f:

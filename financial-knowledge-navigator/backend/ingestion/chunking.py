@@ -1,5 +1,5 @@
 import hashlib
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 def _document_fingerprint(text: str) -> str:
@@ -11,6 +11,8 @@ def chunk_text(
     source_name: str,
     chunk_size: int = 700,
     chunk_overlap: int = 120,
+    document_fingerprint: Optional[str] = None,
+    start_chunk_index: int = 0,
 ) -> List[Dict]:
     """
     Character-based chunker that respects word boundaries.
@@ -22,9 +24,9 @@ def chunk_text(
 
     chunks = []
     start = 0
-    chunk_id = 0
+    chunk_id = start_chunk_index
     text_len = len(text)
-    document_fingerprint = _document_fingerprint(text)
+    document_fingerprint = (document_fingerprint or _document_fingerprint(text))[:12]
 
     while start < text_len:
         end = min(start + chunk_size, text_len)

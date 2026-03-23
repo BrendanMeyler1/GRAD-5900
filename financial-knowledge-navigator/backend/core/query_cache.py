@@ -1,7 +1,7 @@
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from backend.core.config import settings
 
@@ -27,6 +27,8 @@ class QueryResultCache:
         top_k: int,
         chunk_size: int,
         chunk_overlap: int,
+        retrieval_backend: str = "",
+        graph_backend: str = "",
         version: str = "v1",
     ) -> str:
         payload = {
@@ -37,6 +39,8 @@ class QueryResultCache:
             "top_k": top_k,
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
+            "retrieval_backend": retrieval_backend,
+            "graph_backend": graph_backend,
             "version": version,
         }
         return self._make_key(payload)
@@ -68,7 +72,7 @@ class QueryResultCache:
         if not path.exists():
             return None
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             return json.load(f)
 
     def save(self, key: str, payload: Dict[str, Any]) -> str:
@@ -83,3 +87,34 @@ class QueryResultCache:
             "cache_dir": str(self.cache_dir),
             "num_entries": len(files),
         }
+
+    def list_entries(self) -> List[Dict[str, Any]]:
+        entries = []
+        for path in sorted(self.cache_dir.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+            try:
+                with open(path, "r", encoding="utf-8-sig") as f:
+                    payload = json.load(f)
+            except Exception:
+                payload = {}
+
+            entry_type = "pipeline" if "selected_results" in payload else "judge"
+            entries.append(
+                {
+                    "key": path.stem,
+                    "path": str(path),
+                    "size_bytes": path.stat().st_size,
+                    "entry_type": entry_type,
+                    "query": payload.get("query") or payload.get("question") or "",
+                    "mode": payload.get("mode", ""),
+                }
+            )
+
+        return entries
+
+    def delete(self, key: str) -> bool:
+        path = self._path_for_key(key)
+        if not path.exists():
+            return False
+
+        path.unlink()
+        return True

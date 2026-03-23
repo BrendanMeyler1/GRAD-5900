@@ -18,6 +18,9 @@ class CacheInvalidationManager:
         self.reports_dir = Path("data/reports")
         self.uploads_dir = Path("data/uploads")
         self.qdrant_dir = Path(settings.qdrant_path)
+        self.facts_db_path = Path(settings.facts_db_path)
+        self.online_eval_db_path = Path(settings.online_eval_db_path)
+        self.release_workflow_db_path = Path(settings.release_workflow_db_path)
 
     def _safe_remove_dir_contents(self, path: Path) -> int:
         """
@@ -94,6 +97,30 @@ class CacheInvalidationManager:
         self.qdrant_dir.mkdir(parents=True, exist_ok=True)
         return {"qdrant_reset": 1}
 
+    def clear_structured_facts(self) -> Dict[str, int]:
+        removed = 0
+        if self.facts_db_path.exists():
+            self.facts_db_path.unlink(missing_ok=True)
+            removed = 1
+        self.facts_db_path.parent.mkdir(parents=True, exist_ok=True)
+        return {"structured_facts_reset": removed}
+
+    def clear_online_telemetry(self) -> Dict[str, int]:
+        removed = 0
+        if self.online_eval_db_path.exists():
+            self.online_eval_db_path.unlink(missing_ok=True)
+            removed = 1
+        self.online_eval_db_path.parent.mkdir(parents=True, exist_ok=True)
+        return {"online_telemetry_reset": removed}
+
+    def clear_release_workflow(self) -> Dict[str, int]:
+        removed = 0
+        if self.release_workflow_db_path.exists():
+            self.release_workflow_db_path.unlink(missing_ok=True)
+            removed = 1
+        self.release_workflow_db_path.parent.mkdir(parents=True, exist_ok=True)
+        return {"release_workflow_reset": removed}
+
     def full_reset(self) -> Dict[str, int]:
         results = {}
         results.update(self.clear_query_cache())
@@ -102,4 +129,7 @@ class CacheInvalidationManager:
         results.update(self.clear_reports())
         results.update(self.clear_uploads())
         results.update(self.clear_qdrant())
+        results.update(self.clear_structured_facts())
+        results.update(self.clear_online_telemetry())
+        results.update(self.clear_release_workflow())
         return results

@@ -1,14 +1,14 @@
 import json
 from typing import Dict, Any, Optional
 
-from openai import OpenAI
-
+from backend.core.clients import openai_client
 from backend.core.config import settings
+from backend.eval.base import AnswerJudge
 
 
-class LLMJudge:
+class LLMJudge(AnswerJudge):
     def __init__(self, query_cache=None):
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = openai_client
         self.query_cache = query_cache
 
     def _safe_json_loads(self, text: str) -> Dict[str, Any]:

@@ -49,3 +49,18 @@ def test_chunk_ids_change_when_document_content_changes():
     updated = chunk_text("alpha beta zeta delta", "report.pdf", chunk_size=12, chunk_overlap=3)
 
     assert [c["chunk_id"] for c in original] != [c["chunk_id"] for c in updated]
+
+
+def test_chunk_text_accepts_explicit_fingerprint_and_start_index():
+    chunks = chunk_text(
+        "alpha beta gamma delta epsilon zeta",
+        "report.pdf",
+        chunk_size=12,
+        chunk_overlap=3,
+        document_fingerprint="feedfacecafebeef",
+        start_chunk_index=7,
+    )
+
+    assert chunks
+    assert chunks[0]["chunk_id"] == "report.pdf::feedfacecafe::chunk_7"
+    assert chunks[-1]["chunk_id"].startswith("report.pdf::feedfacecafe::chunk_")

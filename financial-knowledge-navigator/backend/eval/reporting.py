@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -11,7 +11,7 @@ class EvaluationReportGenerator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _timestamp(self) -> str:
-        return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     def _top_failure_cases(self, results_by_mode: Dict[str, List[Dict[str, Any]]], top_n: int = 3):
         failures = []
@@ -57,6 +57,8 @@ class EvaluationReportGenerator:
             "combined_overall",
             "heuristic_overall",
             "llm_overall",
+            "ragas_backend",
+            "ragas_overall",
             "cache_hit",
             "retrieved_sources",
             "token_overlap",
@@ -64,6 +66,11 @@ class EvaluationReportGenerator:
             "entity_coverage",
             "relationship_coverage",
             "answer_length",
+            "context_precision",
+            "context_recall",
+            "answer_relevancy",
+            "answer_correctness",
+            "faithfulness",
             "judge_summary",
         ]
 
@@ -75,6 +82,8 @@ class EvaluationReportGenerator:
                 for result in results:
                     heuristic_scores = result.get("heuristic_scores", {})
                     llm_scores = result.get("llm_judge", {}).get("scores", {})
+                    ragas = result.get("ragas", {})
+                    ragas_scores = ragas.get("scores", {})
 
                     writer.writerow(
                         {
@@ -84,6 +93,8 @@ class EvaluationReportGenerator:
                             "combined_overall": result.get("combined_overall"),
                             "heuristic_overall": result.get("heuristic_overall"),
                             "llm_overall": llm_scores.get("overall"),
+                            "ragas_backend": ragas.get("backend"),
+                            "ragas_overall": ragas_scores.get("overall"),
                             "cache_hit": result.get("cache_hit"),
                             "retrieved_sources": " | ".join(result.get("retrieved_sources", [])),
                             "token_overlap": heuristic_scores.get("token_overlap"),
@@ -91,6 +102,11 @@ class EvaluationReportGenerator:
                             "entity_coverage": heuristic_scores.get("entity_coverage"),
                             "relationship_coverage": heuristic_scores.get("relationship_coverage"),
                             "answer_length": heuristic_scores.get("answer_length"),
+                            "context_precision": ragas_scores.get("context_precision"),
+                            "context_recall": ragas_scores.get("context_recall"),
+                            "answer_relevancy": ragas_scores.get("answer_relevancy"),
+                            "answer_correctness": ragas_scores.get("answer_correctness"),
+                            "faithfulness": ragas_scores.get("faithfulness"),
                             "judge_summary": result.get("llm_judge", {}).get("summary", ""),
                         }
                     )
@@ -114,9 +130,8 @@ class EvaluationReportGenerator:
         lines.append("")
         lines.append("This report summarizes evaluation results across retrieval and reasoning modes.")
         lines.append("Modes compared:")
-        lines.append("- Vector")
-        lines.append("- Hybrid")
-        lines.append("- GraphRAG")
+        for mode in summary.keys():
+            lines.append(f"- {mode}")
         lines.append("")
 
         lines.append("## Summary by Mode")
@@ -127,6 +142,7 @@ class EvaluationReportGenerator:
             lines.append(f"- Average combined overall: {mode_summary.get('average_combined_overall', 0):.3f}")
             lines.append(f"- Average heuristic overall: {mode_summary.get('average_heuristic_overall', 0):.3f}")
             lines.append(f"- Average LLM overall (0-5): {mode_summary.get('average_llm_overall_0_to_5', 0):.3f}")
+            lines.append(f"- Average standardized RAG overall: {mode_summary.get('average_ragas_overall', 0):.3f}")
             lines.append(f"- Number of questions: {mode_summary.get('num_questions', 0)}")
             lines.append(f"- Pipeline cache hits: {mode_summary.get('cache_hits', 0)}")
             lines.append("")
@@ -142,6 +158,14 @@ class EvaluationReportGenerator:
             for metric_name, value in mode_summary.get("average_llm_metrics", {}).items():
                 lines.append(f"- {metric_name}: {value:.3f}")
             lines.append("")
+
+            if mode_summary.get("average_ragas_metrics"):
+                lines.append("#### Standardized RAG Metrics")
+                lines.append("")
+                lines.append(f"- Backend: {mode_summary.get('ragas_backend', 'unknown')}")
+                for metric_name, value in mode_summary.get("average_ragas_metrics", {}).items():
+                    lines.append(f"- {metric_name}: {value:.3f}")
+                lines.append("")
 
         lines.append("## Top Failure Cases")
         lines.append("")
@@ -171,6 +195,7 @@ class EvaluationReportGenerator:
                 lines.append(f"- Combined overall: {result.get('combined_overall', 0):.3f}")
                 lines.append(f"- Heuristic overall: {result.get('heuristic_overall', 0):.3f}")
                 lines.append(f"- LLM overall: {result.get('llm_judge', {}).get('scores', {}).get('overall', 0)}")
+                lines.append(f"- Standardized RAG overall: {result.get('ragas', {}).get('scores', {}).get('overall', 0):.3f}")
                 lines.append(f"- Cache hit: {result.get('cache_hit', False)}")
                 lines.append(f"- Judge summary: {result.get('llm_judge', {}).get('summary', '')}")
                 lines.append("")

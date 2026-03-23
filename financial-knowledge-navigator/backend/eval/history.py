@@ -83,12 +83,17 @@ class EvaluationHistoryManager:
                     mode_b.get("average_llm_overall_0_to_5", 0.0)
                     - mode_a.get("average_llm_overall_0_to_5", 0.0)
                 ),
+                "average_ragas_overall_delta": (
+                    mode_b.get("average_ragas_overall", 0.0)
+                    - mode_a.get("average_ragas_overall", 0.0)
+                ),
                 "cache_hits_delta": (
                     mode_b.get("cache_hits", 0)
                     - mode_a.get("cache_hits", 0)
                 ),
                 "heuristic_metric_deltas": {},
                 "llm_metric_deltas": {},
+                "ragas_metric_deltas": {},
             }
 
             heur_a = mode_a.get("average_heuristic_metrics", {})
@@ -104,6 +109,13 @@ class EvaluationHistoryManager:
 
             for key in llm_keys:
                 row["llm_metric_deltas"][key] = llm_b.get(key, 0.0) - llm_a.get(key, 0.0)
+
+            ragas_a = mode_a.get("average_ragas_metrics", {})
+            ragas_b = mode_b.get("average_ragas_metrics", {})
+            ragas_keys = sorted(set(ragas_a.keys()) | set(ragas_b.keys()))
+
+            for key in ragas_keys:
+                row["ragas_metric_deltas"][key] = ragas_b.get(key, 0.0) - ragas_a.get(key, 0.0)
 
             comparison[mode] = row
 

@@ -1,15 +1,14 @@
 import json
 from typing import Dict, List
 
-from openai import OpenAI
-
+from backend.core.clients import openai_client
 from backend.core.config import settings
 from backend.graph.schema import ALLOWED_ENTITY_TYPES
 
 
 class QueryGraphLinker:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = openai_client
 
     def _safe_json_loads(self, text: str) -> Dict:
         text = text.strip()
@@ -19,8 +18,11 @@ class QueryGraphLinker:
             start = text.find("{")
             end = text.rfind("}")
             if start != -1 and end != -1 and end > start:
-                return json.loads(text[start:end + 1])
-            raise
+                try:
+                    return json.loads(text[start:end + 1])
+                except json.JSONDecodeError:
+                    pass
+            return {"entities": []}
 
     def extract_query_entities(self, query: str) -> List[Dict]:
         """

@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class EvaluationHistoryReportGenerator:
@@ -9,7 +9,7 @@ class EvaluationHistoryReportGenerator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _timestamp(self) -> str:
-        return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     def export_comparison_markdown(
         self,
@@ -35,6 +35,7 @@ class EvaluationHistoryReportGenerator:
             lines.append(f"- Combined overall delta: {row['average_combined_overall_delta']:.3f}")
             lines.append(f"- Heuristic overall delta: {row['average_heuristic_overall_delta']:.3f}")
             lines.append(f"- LLM overall delta: {row['average_llm_overall_delta']:.3f}")
+            lines.append(f"- Standardized RAG overall delta: {row['average_ragas_overall_delta']:.3f}")
             lines.append(f"- Cache hits delta: {row['cache_hits_delta']}")
             lines.append("")
 
@@ -47,6 +48,12 @@ class EvaluationHistoryReportGenerator:
             lines.append("### LLM Metric Deltas")
             lines.append("")
             for key, value in row["llm_metric_deltas"].items():
+                lines.append(f"- {key}: {value:.3f}")
+            lines.append("")
+
+            lines.append("### Standardized RAG Metric Deltas")
+            lines.append("")
+            for key, value in row["ragas_metric_deltas"].items():
                 lines.append(f"- {key}: {value:.3f}")
             lines.append("")
 

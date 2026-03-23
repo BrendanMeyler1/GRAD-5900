@@ -1,4 +1,4 @@
-from typing import List, Dict, Set
+from typing import List, Dict, Optional, Set
 from uuid import uuid4
 
 from qdrant_client import QdrantClient
@@ -6,12 +6,15 @@ from qdrant_client.http import models
 
 from backend.core.clients import openai_client
 from backend.core.config import settings
+from backend.retrieval.base import Retriever
 
 # Issue #7: Maximum texts per embedding API call to avoid token limits
 EMBED_BATCH_SIZE = 100
 
 
-class VectorStore:
+class VectorStore(Retriever):
+    backend_name = "local_vector"
+
     def __init__(self):
         self.client = openai_client
         self.qdrant = QdrantClient(path=settings.qdrant_path)
@@ -21,6 +24,20 @@ class VectorStore:
 
         self._ensure_collection()
         self._load_existing_chunk_ids()
+
+    def _recreate_qdrant_client(self) -> None:
+        self.qdrant = QdrantClient(path=settings.qdrant_path)
+        self.indexed_chunk_ids = set()
+        self._ensure_collection()
+        self._load_existing_chunk_ids()
+
+    def ensure_open(self) -> None:
+        try:
+            self.qdrant.get_collections()
+        except RuntimeError as exc:
+            if "closed" not in str(exc).lower():
+                raise
+            self._recreate_qdrant_client()
 
     def _ensure_collection(self) -> None:
         collections = self.qdrant.get_collections().collections
@@ -73,6 +90,16 @@ class VectorStore:
             ]
         )
 
+    def _file_hash_filter(self, file_hash: str) -> models.Filter:
+        return models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="file_hash",
+                    match=models.MatchValue(value=file_hash),
+                )
+            ]
+        )
+
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """Embed texts in batches to avoid exceeding API token limits."""
         all_embeddings = []
@@ -85,6 +112,29 @@ class VectorStore:
             all_embeddings.extend([item.embedding for item in response.data])
         return all_embeddings
 
+    def _embed_chunk_batch(self, chunks: List[Dict]) -> List[models.PointStruct]:
+        texts = [chunk["text"] for chunk in chunks]
+        response = self.client.embeddings.create(
+            model=settings.embedding_model,
+            input=texts,
+        )
+
+        points = []
+        for chunk, item in zip(chunks, response.data):
+            points.append(
+                models.PointStruct(
+                    id=str(uuid4()),
+                    vector=item.embedding,
+                    payload={
+                        "chunk_id": chunk["chunk_id"],
+                        "source": chunk["source"],
+                        "text": chunk["text"],
+                        "file_hash": chunk.get("file_hash"),
+                    },
+                )
+            )
+        return points
+
     def embed_query(self, query: str) -> List[float]:
         response = self.client.embeddings.create(
             model=settings.embedding_model,
@@ -93,6 +143,7 @@ class VectorStore:
         return response.data[0].embedding
 
     def index_chunks(self, chunks: List[Dict]) -> int:
+        self.ensure_open()
         if not chunks:
             return 0
 
@@ -100,34 +151,26 @@ class VectorStore:
         if not new_chunks:
             return 0
 
-        texts = [chunk["text"] for chunk in new_chunks]
-        embeddings = self.embed_texts(texts)
+        indexed_count = 0
 
-        points = []
-        for chunk, embedding in zip(new_chunks, embeddings):
-            points.append(
-                models.PointStruct(
-                    id=str(uuid4()),
-                    vector=embedding,
-                    payload={
-                        "chunk_id": chunk["chunk_id"],
-                        "source": chunk["source"],
-                        "text": chunk["text"],
-                    },
-                )
+        for i in range(0, len(new_chunks), EMBED_BATCH_SIZE):
+            batch = new_chunks[i : i + EMBED_BATCH_SIZE]
+            points = self._embed_chunk_batch(batch)
+
+            self.qdrant.upsert(
+                collection_name=self.collection_name,
+                points=points,
             )
 
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=points,
-        )
+            for chunk in batch:
+                self.indexed_chunk_ids.add(chunk["chunk_id"])
 
-        for chunk in new_chunks:
-            self.indexed_chunk_ids.add(chunk["chunk_id"])
+            indexed_count += len(batch)
 
-        return len(new_chunks)
+        return indexed_count
 
-    def delete_source(self, source_name: str) -> int:
+    def delete_source(self, source_name: str, file_ids=None) -> int:
+        self.ensure_open()
         source_filter = self._source_filter(source_name)
         chunk_ids_to_remove = set()
         offset = None
@@ -160,8 +203,19 @@ class VectorStore:
 
         return len(chunk_ids_to_remove)
 
-    def search(self, query: str, top_k: int = 5) -> List[Dict]:
+    def reset_store(self) -> None:
+        self.ensure_open()
+        try:
+            self.qdrant.delete_collection(self.collection_name)
+        except Exception:
+            pass
+        self.indexed_chunk_ids = set()
+        self._ensure_collection()
+
+    def search(self, query: str, top_k: int = 5, file_hash: Optional[str] = None) -> List[Dict]:
+        self.ensure_open()
         query_vector = self.embed_query(query)
+        query_filter = self._file_hash_filter(file_hash) if file_hash else None
 
         # Use query_points (qdrant-client >= 1.12) with search fallback
         try:
@@ -169,6 +223,7 @@ class VectorStore:
                 collection_name=self.collection_name,
                 query=query_vector,
                 limit=top_k,
+                query_filter=query_filter,
             )
             results = query_response.points
         except AttributeError:
@@ -177,6 +232,7 @@ class VectorStore:
                 collection_name=self.collection_name,
                 query_vector=query_vector,
                 limit=top_k,
+                query_filter=query_filter,
             )
 
         return [
@@ -185,6 +241,7 @@ class VectorStore:
                 "chunk_id": result.payload.get("chunk_id"),
                 "source": result.payload.get("source"),
                 "text": result.payload.get("text"),
+                "file_hash": result.payload.get("file_hash"),
             }
             for result in results
         ]

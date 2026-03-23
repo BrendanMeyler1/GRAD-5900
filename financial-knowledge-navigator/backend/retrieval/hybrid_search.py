@@ -29,6 +29,8 @@ class HybridSearcher:
                     "bm25_score": None,
                     "rrf_score": 0.0,
                 }
+            else:
+                fused[key]["vector_score"] = item["score"]
             fused[key]["rrf_score"] += 1.0 / (self.rrf_k + rank)
 
         for rank, item in enumerate(bm25_results, start=1):

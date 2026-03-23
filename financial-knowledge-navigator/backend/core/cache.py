@@ -33,7 +33,7 @@ class ArtifactCache:
     def _read_json(self, path: Path, default: Any = None) -> Any:
         if not path.exists():
             return default
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             return json.load(f)
 
     def _write_json(self, path: Path, payload: Any) -> None:
@@ -72,6 +72,20 @@ class ArtifactCache:
         manifest["documents"][file_hash] = record
         self.update_manifest(manifest)
 
+    def update_document_fields(self, file_hash: str, **fields: Any) -> None:
+        manifest = self.get_manifest()
+        documents = manifest.setdefault("documents", {})
+        if file_hash not in documents:
+            return
+        documents[file_hash].update(fields)
+        self.update_manifest(manifest)
+
+    def set_field_for_all_documents(self, field_name: str, value: Any) -> None:
+        manifest = self.get_manifest()
+        for record in manifest.setdefault("documents", {}).values():
+            record[field_name] = value
+        self.update_manifest(manifest)
+
     def chunk_artifact_path(self, file_hash: str) -> Path:
         return self.chunks_dir / f"{file_hash}.json"
 
@@ -83,6 +97,13 @@ class ArtifactCache:
         self._write_json(path, chunks)
         return str(path)
 
+    def append_chunks(self, file_hash: str, chunks: List[Dict[str, Any]]) -> str:
+        path = self.chunk_artifact_path(file_hash)
+        existing = self._read_json(path, default=[])
+        existing.extend(chunks)
+        self._write_json(path, existing)
+        return str(path)
+
     def load_chunks(self, file_hash: str) -> Optional[List[Dict[str, Any]]]:
         path = self.chunk_artifact_path(file_hash)
         return self._read_json(path, default=None)
@@ -90,6 +111,13 @@ class ArtifactCache:
     def save_graph_extractions(self, file_hash: str, extractions: List[Dict[str, Any]]) -> str:
         path = self.graph_artifact_path(file_hash)
         self._write_json(path, extractions)
+        return str(path)
+
+    def append_graph_extractions(self, file_hash: str, extractions: List[Dict[str, Any]]) -> str:
+        path = self.graph_artifact_path(file_hash)
+        existing = self._read_json(path, default=[])
+        existing.extend(extractions)
+        self._write_json(path, existing)
         return str(path)
 
     def load_graph_extractions(self, file_hash: str) -> Optional[List[Dict[str, Any]]]:

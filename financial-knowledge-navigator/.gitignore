@@ -7,5 +7,17 @@ data/artifacts/
 data/eval_results/
 data/reports/
 data/uploads/
+data/financial_dataset/
+data/graph/*.db
+data/structured/*.db
+data/telemetry/*.db
+tools/neo4j-runtime/
+tools/jdk17/
+data/neo4j/
+streamlit.stdout.log
+streamlit.stderr.log
+tests/apptemp/
+tests/ui_verify/
+tests/.tmp_facts_*.db
 *.pdf
 .DS_Store

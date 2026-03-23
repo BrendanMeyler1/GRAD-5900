@@ -1,11 +1,11 @@
 import json
 from typing import Dict, Any
-from openai import OpenAI
+from backend.core.clients import openai_client
 from backend.core.config import settings
 
 class SelfCorrector:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = openai_client
 
     def grade_relevance(self, query: str, context: str) -> bool:
         """Evaluate if the context is sufficiently relevant to answer the query."""
