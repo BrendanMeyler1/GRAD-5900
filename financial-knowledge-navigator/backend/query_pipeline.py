@@ -26,25 +26,39 @@ class QueryPipeline:
         self.self_corrector = self_corrector
 
     def _retrieve(self, query: str, mode: str, top_k: int) -> Dict[str, Any]:
-        if mode == "vector":
+        """
+        Dispatch retrieval by mode.
+
+        Supported modes:
+          - "vector": Dense vector search only.
+          - "bm25": Sparse BM25 keyword search only.
+          - "hybrid": Reciprocal Rank Fusion of vector + BM25.
+          - "graphrag": Same retrieval as hybrid; graph context is layered on
+            in the generation stage by build_graph_context(). This is a
+            runner-level concept documented here for explicitness.
+        """
+        # graphrag uses hybrid retrieval; graph enrichment happens downstream
+        effective_mode = mode if mode != "graphrag" else "hybrid"
+
+        if effective_mode == "vector":
             vector_results = self.vector_store.search(query=query, top_k=top_k)
             return {
                 "selected_results": vector_results,
                 "vector_results": vector_results,
                 "bm25_results": [],
-                "mode": "vector",
+                "mode": mode,
             }
 
-        if mode == "bm25":
+        if effective_mode == "bm25":
             bm25_results = self.bm25_store.search(query=query, top_k=top_k)
             return {
                 "selected_results": bm25_results,
                 "vector_results": [],
                 "bm25_results": bm25_results,
-                "mode": "bm25",
+                "mode": mode,
             }
 
-        if mode == "hybrid":
+        if effective_mode == "hybrid":
             search_output = self.hybrid_searcher.search(
                 query=query,
                 top_k=top_k,
@@ -54,7 +68,7 @@ class QueryPipeline:
                 "selected_results": search_output["hybrid_results"],
                 "vector_results": search_output["vector_results"],
                 "bm25_results": search_output["bm25_results"],
-                "mode": "hybrid",
+                "mode": mode,
             }
 
         raise ValueError(f"Unsupported mode: {mode}")
@@ -118,11 +132,17 @@ class QueryPipeline:
             retrieved_chunks=selected_results,
         )
 
-        graph_output = self.graphrag_engine.build_graph_context(
-            query=query,
-            radius=1,
-            max_edges=20,
-        )
+        try:
+            graph_output = self.graphrag_engine.build_graph_context(
+                query=query,
+                radius=1,
+                max_edges=20,
+            )
+        except Exception:
+            graph_output = {
+                "graph_context_text": "Graph context unavailable due to a graph processing error.",
+                "matched_nodes": [],
+            }
 
         refined_answer = self.refined_answer_generator.generate_refined_answer(
             question=query,

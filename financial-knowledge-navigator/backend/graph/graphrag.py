@@ -12,7 +12,10 @@ class GraphRAGEngine:
         to graph nodes. Falls back to lexical node matching if necessary.
         """
         graph = self.knowledge_graph.get_graph()
-        query_entities = self.query_graph_linker.extract_query_entities(query)
+        try:
+            query_entities = self.query_graph_linker.extract_query_entities(query)
+        except Exception:
+            query_entities = []
 
         matched_node_ids = []
 

@@ -9,6 +9,24 @@ class FinancialKnowledgeGraph:
     def _node_id(self, entity_name: str, entity_type: str) -> str:
         return f"{entity_type}::{entity_name.strip().lower()}"
 
+    def _has_edge(
+        self,
+        source_node_id: str,
+        target_node_id: str,
+        rel_type: str,
+        source: str,
+        chunk_id: str,
+    ) -> bool:
+        existing_edges = self.graph.get_edge_data(source_node_id, target_node_id, default={})
+        for attrs in existing_edges.values():
+            if (
+                attrs.get("relationship_type") == rel_type
+                and attrs.get("source_doc") == source
+                and attrs.get("chunk_id") == chunk_id
+            ):
+                return True
+        return False
+
     def add_extraction_result(self, extraction: Dict) -> None:
         chunk_id = extraction.get("chunk_id")
         source = extraction.get("source")
@@ -26,14 +44,14 @@ class FinancialKnowledgeGraph:
                     node_id,
                     label=name,
                     entity_type=entity_type,
-                    sources=set([source]) if source else set(),
-                    chunk_ids=set([chunk_id]) if chunk_id else set(),
+                    sources=[source] if source else [],
+                    chunk_ids=[chunk_id] if chunk_id else [],
                 )
             else:
-                if source:
-                    self.graph.nodes[node_id]["sources"].add(source)
-                if chunk_id:
-                    self.graph.nodes[node_id]["chunk_ids"].add(chunk_id)
+                if source and source not in self.graph.nodes[node_id]["sources"]:
+                    self.graph.nodes[node_id]["sources"].append(source)
+                if chunk_id and chunk_id not in self.graph.nodes[node_id]["chunk_ids"]:
+                    self.graph.nodes[node_id]["chunk_ids"].append(chunk_id)
 
         for rel in extraction.get("relationships", []):
             source_name = rel["source"]
@@ -44,6 +62,8 @@ class FinancialKnowledgeGraph:
             target_node_id = entity_name_to_node_id.get(target_name)
 
             if not source_node_id or not target_node_id:
+                continue
+            if self._has_edge(source_node_id, target_node_id, rel_type, source, chunk_id):
                 continue
 
             self.graph.add_edge(

@@ -29,11 +29,9 @@ class EvaluationRunner:
         expected_entities = item.get("key_entities", [])
         expected_relationships = item.get("expected_relationships", [])
 
-        effective_mode = "hybrid" if mode == "graphrag" else mode
-
         pipeline_result = self.query_pipeline.run(
             query=question,
-            mode=effective_mode,
+            mode=mode,
             indexed_docs=indexed_docs,
             top_k=top_k,
             use_cache=True,
@@ -47,6 +45,7 @@ class EvaluationRunner:
         refined_answer = pipeline_result["refined_answer"]
 
         final_answer = refined_answer if mode == "graphrag" else baseline_answer
+        graph_context_for_mode = graph_context_text if mode == "graphrag" else ""
 
         heuristic_scores = {
             "token_overlap": token_overlap_score(ideal_answer, final_answer),
@@ -54,11 +53,11 @@ class EvaluationRunner:
             "entity_coverage": entity_coverage_score(
                 expected_entities,
                 final_answer,
-                graph_context_text,
+                graph_context_for_mode,
             ),
             "relationship_coverage": relationship_coverage_score(
                 expected_relationships,
-                graph_context_text,
+                graph_context_for_mode,
             ),
             "answer_length": answer_length_score(final_answer),
         }

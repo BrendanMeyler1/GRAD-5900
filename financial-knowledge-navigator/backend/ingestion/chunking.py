@@ -1,4 +1,9 @@
+import hashlib
 from typing import List, Dict
+
+
+def _document_fingerprint(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
 
 def chunk_text(
@@ -8,8 +13,9 @@ def chunk_text(
     chunk_overlap: int = 120,
 ) -> List[Dict]:
     """
-    Simple character-based chunker.
-    Good enough for starter build; can be upgraded later to token-based chunking.
+    Character-based chunker that respects word boundaries.
+    Avoids splitting mid-word by scanning for whitespace at both
+    the end of a chunk and the start of the next (overlap) chunk.
     """
     if not text.strip():
         return []
@@ -17,24 +23,45 @@ def chunk_text(
     chunks = []
     start = 0
     chunk_id = 0
+    text_len = len(text)
+    document_fingerprint = _document_fingerprint(text)
 
-    while start < len(text):
-        end = min(start + chunk_size, len(text))
+    while start < text_len:
+        end = min(start + chunk_size, text_len)
+
+        # Snap end backwards to a word boundary (space)
+        if end < text_len and text[end] != " ":
+            boundary = text.rfind(" ", start, end)
+            if boundary > start:
+                end = boundary
+
         chunk = text[start:end].strip()
 
         if chunk:
             chunks.append(
                 {
-                    "chunk_id": f"{source_name}::chunk_{chunk_id}",
+                    "chunk_id": f"{source_name}::{document_fingerprint}::chunk_{chunk_id}",
                     "source": source_name,
                     "text": chunk,
                 }
             )
             chunk_id += 1
 
-        if end == len(text):
+        if end >= text_len:
             break
 
-        start = max(0, end - chunk_overlap)
+        # Compute next start with overlap, snapping forward to a word boundary
+        next_start = max(0, end - chunk_overlap)
+        if next_start > 0 and next_start < text_len and text[next_start] != " ":
+            space_pos = text.find(" ", next_start, end)
+            if space_pos != -1:
+                next_start = space_pos + 1
+            else:
+                # No space found in overlap zone; just start at end
+                next_start = end
+        elif next_start < text_len and text[next_start] == " ":
+            next_start += 1  # Skip the space itself
+
+        start = next_start
 
     return chunks

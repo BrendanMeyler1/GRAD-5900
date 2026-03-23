@@ -19,6 +19,9 @@ class ArtifactCache:
         self.chunks_dir.mkdir(parents=True, exist_ok=True)
         self.graph_dir.mkdir(parents=True, exist_ok=True)
 
+        # Issue #6 fix: in-memory manifest cache to avoid redundant disk reads
+        self._manifest_cache: Optional[Dict[str, Any]] = None
+
         if not self.manifest_path.exists():
             self._write_json(
                 self.manifest_path,
@@ -46,9 +49,13 @@ class ArtifactCache:
         return sha.hexdigest()
 
     def get_manifest(self) -> Dict[str, Any]:
-        return self._read_json(self.manifest_path, default={"documents": {}})
+        if self._manifest_cache is not None:
+            return self._manifest_cache
+        self._manifest_cache = self._read_json(self.manifest_path, default={"documents": {}})
+        return self._manifest_cache
 
     def update_manifest(self, manifest: Dict[str, Any]) -> None:
+        self._manifest_cache = manifest
         self._write_json(self.manifest_path, manifest)
 
     def get_document_record(self, file_hash: str) -> Optional[Dict[str, Any]]:
@@ -94,3 +101,48 @@ class ArtifactCache:
         docs = list(manifest.get("documents", {}).values())
         docs.sort(key=lambda x: x.get("source_name", ""))
         return docs
+
+    def list_indexed_document_keys(self) -> List[str]:
+        return [
+            self.make_document_cache_key(record)
+            for record in self.list_indexed_documents()
+        ]
+
+    def make_document_cache_key(self, record: Dict[str, Any]) -> str:
+        source_name = record.get("source_name", "")
+        file_hash = record.get("file_hash", "")
+        return f"{source_name}::{file_hash}" if file_hash else source_name
+
+    def list_document_records_for_source(self, source_name: str) -> List[Dict[str, Any]]:
+        return [
+            record
+            for record in self.list_indexed_documents()
+            if record.get("source_name") == source_name
+        ]
+
+    def delete_document_artifacts(self, file_hash: str) -> Dict[str, int]:
+        removed = {
+            "manifest_removed": 0,
+            "chunk_artifact_removed": 0,
+            "graph_artifact_removed": 0,
+        }
+
+        chunk_path = self.chunk_artifact_path(file_hash)
+        graph_path = self.graph_artifact_path(file_hash)
+
+        if chunk_path.exists():
+            chunk_path.unlink()
+            removed["chunk_artifact_removed"] = 1
+
+        if graph_path.exists():
+            graph_path.unlink()
+            removed["graph_artifact_removed"] = 1
+
+        manifest = self.get_manifest()
+        documents = manifest.get("documents", {})
+        if file_hash in documents:
+            del documents[file_hash]
+            removed["manifest_removed"] = 1
+            self.update_manifest(manifest)
+
+        return removed

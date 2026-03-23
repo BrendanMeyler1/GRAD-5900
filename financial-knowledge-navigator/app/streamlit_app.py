@@ -1,4 +1,7 @@
 import sys
+import hashlib
+import time
+import asyncio
 from pathlib import Path
 
 import streamlit as st
@@ -12,7 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 from backend.core.config import settings
 from backend.core.cache import ArtifactCache
 from backend.core.query_cache import QueryResultCache
-from backend.ingestion.loaders import save_uploaded_file, load_pdf_text
+from backend.ingestion.loaders import save_uploaded_file, load_document_text
 from backend.ingestion.chunking import chunk_text
 from backend.retrieval.vector_store import VectorStore
 from backend.retrieval.bm25_store import BM25Store
@@ -49,8 +52,12 @@ if "artifact_cache" not in st.session_state:
 if "query_cache" not in st.session_state:
     st.session_state.query_cache = QueryResultCache()
 
+@st.cache_resource
+def get_vector_store():
+    return VectorStore()
+
 if "vector_store" not in st.session_state:
-    st.session_state.vector_store = VectorStore()
+    st.session_state.vector_store = get_vector_store()
 
 if "bm25_store" not in st.session_state:
     st.session_state.bm25_store = BM25Store()
@@ -215,17 +222,8 @@ if not st.session_state.cache_restored:
 if not st.session_state.run_history:
     st.session_state.run_history = st.session_state.history_manager.list_runs()
 
-def rebuild_runtime_state_after_partial_clear():
-    """
-    Rebuild lightweight runtime-only objects after cache invalidation.
-    """
-    st.session_state.bm25_store = BM25Store()
-    st.session_state.knowledge_graph = FinancialKnowledgeGraph()
-    st.session_state.graphrag_engine = GraphRAGEngine(
-        knowledge_graph=st.session_state.knowledge_graph,
-        query_graph_linker=st.session_state.query_graph_linker,
-    )
-    st.session_state.query_pipeline = QueryPipeline(
+def build_query_pipeline():
+    return QueryPipeline(
         vector_store=st.session_state.vector_store,
         bm25_store=st.session_state.bm25_store,
         hybrid_searcher=st.session_state.hybrid_searcher,
@@ -233,15 +231,39 @@ def rebuild_runtime_state_after_partial_clear():
         refined_answer_generator=st.session_state.refined_answer_generator,
         graphrag_engine=st.session_state.graphrag_engine,
         query_cache=st.session_state.query_cache,
+        self_corrector=st.session_state.self_corrector,
     )
+
+def rebuild_runtime_services():
+    st.session_state.hybrid_searcher = HybridSearcher(
+        vector_store=st.session_state.vector_store,
+        bm25_store=st.session_state.bm25_store,
+    )
+    st.session_state.graphrag_engine = GraphRAGEngine(
+        knowledge_graph=st.session_state.knowledge_graph,
+        query_graph_linker=st.session_state.query_graph_linker,
+    )
+    st.session_state.query_pipeline = build_query_pipeline()
     st.session_state.evaluation_runner = EvaluationRunner(
         query_pipeline=st.session_state.query_pipeline,
         llm_judge=st.session_state.llm_judge,
     )
 
-def restore_cached_state_into_memory():
+def get_indexed_doc_cache_keys():
+    return st.session_state.artifact_cache.list_indexed_document_keys()
+
+def rebuild_runtime_state_after_partial_clear():
     """
-    Reload cached chunks and graph extractions from disk into in-memory BM25 and NetworkX.
+    Rebuild lightweight runtime-only objects after cache invalidation.
+    """
+    st.session_state.bm25_store = BM25Store()
+    st.session_state.knowledge_graph = FinancialKnowledgeGraph()
+    rebuild_runtime_services()
+
+def restore_cached_state_into_memory(reindex_vectors: bool = True):
+    """
+    Reload cached chunks and graph extractions from disk into in-memory BM25 and
+    NetworkX, and optionally repopulate the vector index from cached chunks.
     """
     st.session_state.indexed_docs = []
     st.session_state.all_chunks = []
@@ -257,6 +279,8 @@ def restore_cached_state_into_memory():
 
         cached_chunks = st.session_state.artifact_cache.load_chunks(record["file_hash"])
         if cached_chunks:
+            if reindex_vectors:
+                st.session_state.vector_store.index_chunks(cached_chunks)
             st.session_state.all_chunks.extend(cached_chunks)
             st.session_state.bm25_store.index_chunks(cached_chunks)
 
@@ -269,23 +293,25 @@ def restore_cached_state_into_memory():
         extraction_batches,
     )
 
-    st.session_state.graphrag_engine = GraphRAGEngine(
-        knowledge_graph=st.session_state.knowledge_graph,
-        query_graph_linker=st.session_state.query_graph_linker,
-    )
-    st.session_state.query_pipeline = QueryPipeline(
-        vector_store=st.session_state.vector_store,
-        bm25_store=st.session_state.bm25_store,
-        hybrid_searcher=st.session_state.hybrid_searcher,
-        answer_generator=st.session_state.answer_generator,
-        refined_answer_generator=st.session_state.refined_answer_generator,
-        graphrag_engine=st.session_state.graphrag_engine,
-        query_cache=st.session_state.query_cache,
-    )
-    st.session_state.evaluation_runner = EvaluationRunner(
-        query_pipeline=st.session_state.query_pipeline,
-        llm_judge=st.session_state.llm_judge,
-    )
+    rebuild_runtime_services()
+
+def remove_replaced_source_versions(source_name: str, incoming_file_hash: str) -> int:
+    st.session_state.vector_store.delete_source(source_name)
+    prior_records = [
+        record
+        for record in st.session_state.artifact_cache.list_document_records_for_source(source_name)
+        if record.get("file_hash") != incoming_file_hash
+    ]
+
+    if not prior_records:
+        return 0
+
+    st.session_state.vector_store.delete_source(source_name)
+    for record in prior_records:
+        st.session_state.artifact_cache.delete_document_artifacts(record["file_hash"])
+
+    restore_cached_state_into_memory(reindex_vectors=True)
+    return len(prior_records)
 
 def reset_output_views():
     st.session_state.last_results = []
@@ -310,8 +336,8 @@ with left_col:
     st.subheader("Upload documents")
 
     uploaded_files = st.file_uploader(
-        "Upload one or more PDF files",
-        type=["pdf"],
+        "Upload one or more files (PDF, HTML, TXT)",
+        type=["pdf", "txt", "html", "htm"],
         accept_multiple_files=True,
     )
 
@@ -322,6 +348,7 @@ with left_col:
             total_chunks_added = 0
             total_graph_extractions = 0
             reused_docs = 0
+            replaced_docs = 0
 
             progress = st.progress(0, text="Starting cache-aware ingestion...")
             files_to_process = uploaded_files
@@ -329,7 +356,7 @@ with left_col:
             for idx, uploaded_file in enumerate(files_to_process, start=1):
                 progress.progress(
                     min(int((idx - 1) / len(files_to_process) * 100), 100),
-                    text=f"Saving {uploaded_file.name}...",
+                    text=f"Processing {uploaded_file.name}...",
                 )
 
                 saved_path = save_uploaded_file(uploaded_file)
@@ -342,11 +369,16 @@ with left_col:
 
                     cached_chunks = st.session_state.artifact_cache.load_chunks(file_hash)
                     if cached_chunks:
+                        total_chunks_added += st.session_state.vector_store.index_chunks(cached_chunks)
                         known_chunk_ids = {c["chunk_id"] for c in st.session_state.all_chunks}
                         new_local_chunks = [c for c in cached_chunks if c["chunk_id"] not in known_chunk_ids]
                         if new_local_chunks:
                             st.session_state.all_chunks.extend(new_local_chunks)
-                            st.session_state.bm25_store.index_chunks(new_local_chunks)
+                        st.session_state.bm25_store.index_chunks(cached_chunks)
+
+                    cached_extractions = st.session_state.artifact_cache.load_graph_extractions(file_hash)
+                    if cached_extractions:
+                        st.session_state.knowledge_graph.build_from_chunks(cached_extractions)
 
                     reused_docs += 1
                     progress.progress(
@@ -355,7 +387,9 @@ with left_col:
                     )
                     continue
 
-                raw_text = load_pdf_text(saved_path)
+                replaced_docs += remove_replaced_source_versions(uploaded_file.name, file_hash)
+
+                raw_text = load_document_text(saved_path)
                 chunks = chunk_text(
                     text=raw_text,
                     source_name=uploaded_file.name,
@@ -372,10 +406,43 @@ with left_col:
                 st.session_state.all_chunks.extend(chunks)
 
                 extraction_batch = []
-                for chunk in chunks:
-                    extracted = st.session_state.graph_extractor.extract_from_chunk(chunk)
-                    extraction_batch.append(extracted)
-                    total_graph_extractions += 1
+                num_chunks = len(chunks)
+                sub_progress = st.progress(0, text=f"Extracting graph entities (Async): 0/{num_chunks} chunks")
+
+                async def process_chunks_concurrently():
+                    tasks = [asyncio.create_task(st.session_state.graph_extractor.extract_from_chunk_async(c)) for c in chunks]
+                    results = []
+                    completed = 0
+                    for task in asyncio.as_completed(tasks):
+                        res = await task
+                        results.append(res)
+                        completed += 1
+                        sub_progress.progress(
+                            min(int((completed / num_chunks) * 100), 100),
+                            text=f"Extracting graph entities (Async): {completed}/{num_chunks} chunks"
+                        )
+                    return results
+
+                if sys.platform == 'win32':
+                    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop and loop.is_running():
+                    # Streamlit >= 1.34 runs scripts in an event loop sometimes.
+                    # Workaround: run it concurrently via loop.create_task if possible 
+                    # but since we need it synchronous to the render tree:
+                    import nest_asyncio
+                    nest_asyncio.apply()
+                    extraction_batch = asyncio.run(process_chunks_concurrently())
+                else:
+                    extraction_batch = asyncio.run(process_chunks_concurrently())
+
+                total_graph_extractions += num_chunks
+                sub_progress.empty()
 
                 st.session_state.artifact_cache.save_graph_extractions(file_hash, extraction_batch)
                 st.session_state.knowledge_graph.build_from_chunks(extraction_batch)
@@ -405,6 +472,7 @@ with left_col:
                 f"Done. New vector chunks indexed: {total_chunks_added}. "
                 f"New graph extractions: {total_graph_extractions}. "
                 f"Cached docs reused: {reused_docs}. "
+                f"Prior versions replaced: {replaced_docs}. "
                 f"Graph now has {summary['num_nodes']} node(s) and {summary['num_edges']} edge(s)."
             )
 
@@ -457,7 +525,7 @@ with left_col:
                 result = st.session_state.invalidation_manager.clear_query_cache()
                 st.session_state.query_cache = QueryResultCache()
                 st.session_state.llm_judge = LLMJudge(query_cache=st.session_state.query_cache)
-                rebuild_runtime_state_after_partial_clear()
+                rebuild_runtime_services()
                 reset_output_views()
                 st.session_state.last_invalidation_result = ("Cleared query cache", result)
                 st.rerun()
@@ -486,20 +554,21 @@ with left_col:
                 result = st.session_state.invalidation_manager.clear_artifact_cache()
 
                 st.session_state.artifact_cache = ArtifactCache()
-                st.session_state.indexed_docs = []
-                st.session_state.all_chunks = []
-
-                rebuild_runtime_state_after_partial_clear()
+                restore_cached_state_into_memory(reindex_vectors=False)
                 reset_output_views()
 
                 st.session_state.last_invalidation_result = ("Cleared artifact cache", result)
                 st.rerun()
 
             if st.button("Reset Local Qdrant Index"):
+                if getattr(st.session_state, "vector_store", None):
+                    st.session_state.vector_store.qdrant.close()
+                get_vector_store.clear()
+
                 result = st.session_state.invalidation_manager.clear_qdrant()
 
-                st.session_state.vector_store = VectorStore()
-                rebuild_runtime_state_after_partial_clear()
+                st.session_state.vector_store = get_vector_store()
+                restore_cached_state_into_memory(reindex_vectors=True)
                 reset_output_views()
 
                 st.session_state.last_invalidation_result = ("Reset local Qdrant index", result)
@@ -508,11 +577,15 @@ with left_col:
         st.markdown("---")
 
         if st.button("Full Local Reset", type="primary"):
+            if getattr(st.session_state, "vector_store", None):
+                st.session_state.vector_store.qdrant.close()
+            get_vector_store.clear()
+
             result = st.session_state.invalidation_manager.full_reset()
 
             st.session_state.artifact_cache = ArtifactCache()
             st.session_state.query_cache = QueryResultCache()
-            st.session_state.vector_store = VectorStore()
+            st.session_state.vector_store = get_vector_store()
             st.session_state.bm25_store = BM25Store()
             st.session_state.knowledge_graph = FinancialKnowledgeGraph()
             st.session_state.indexed_docs = []
@@ -523,24 +596,8 @@ with left_col:
             st.session_state.last_run_comparison = None
             st.session_state.last_comparison_report_path = None
 
-            st.session_state.graphrag_engine = GraphRAGEngine(
-                knowledge_graph=st.session_state.knowledge_graph,
-                query_graph_linker=st.session_state.query_graph_linker,
-            )
             st.session_state.llm_judge = LLMJudge(query_cache=st.session_state.query_cache)
-            st.session_state.query_pipeline = QueryPipeline(
-                vector_store=st.session_state.vector_store,
-                bm25_store=st.session_state.bm25_store,
-                hybrid_searcher=st.session_state.hybrid_searcher,
-                answer_generator=st.session_state.answer_generator,
-                refined_answer_generator=st.session_state.refined_answer_generator,
-                graphrag_engine=st.session_state.graphrag_engine,
-                query_cache=st.session_state.query_cache,
-            )
-            st.session_state.evaluation_runner = EvaluationRunner(
-                query_pipeline=st.session_state.query_pipeline,
-                llm_judge=st.session_state.llm_judge,
-            )
+            rebuild_runtime_services()
 
             reset_output_views()
             st.session_state.last_invalidation_result = ("Completed full local reset", result)
@@ -572,7 +629,7 @@ with left_col:
             with st.spinner("Running evaluation across vector, hybrid, and GraphRAG with cached pipeline + LLM judge..."):
                 eval_results = st.session_state.evaluation_runner.run_dataset(
                     dataset=dataset,
-                    indexed_docs=st.session_state.indexed_docs,
+                    indexed_docs=get_indexed_doc_cache_keys(),
                 )
                 saved_path = st.session_state.evaluation_runner.save_results(eval_results)
                 st.session_state.last_eval_results = eval_results
@@ -616,7 +673,7 @@ with center_col:
             pipeline_result = st.session_state.query_pipeline.run(
                 query=query,
                 mode=retrieval_mode,
-                indexed_docs=st.session_state.indexed_docs,
+                indexed_docs=get_indexed_doc_cache_keys(),
                 top_k=settings.top_k,
                 use_cache=True,
                 use_correction=use_correction,

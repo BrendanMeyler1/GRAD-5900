@@ -1,16 +1,19 @@
 from typing import List, Dict, Set
 from uuid import uuid4
 
-from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
+from backend.core.clients import openai_client
 from backend.core.config import settings
+
+# Issue #7: Maximum texts per embedding API call to avoid token limits
+EMBED_BATCH_SIZE = 100
 
 
 class VectorStore:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = openai_client
         self.qdrant = QdrantClient(path=settings.qdrant_path)
         self.collection_name = settings.qdrant_collection
         self.vector_size = 1536
@@ -60,12 +63,27 @@ class VectorStore:
             # If scroll fails for any reason, we simply proceed without preload.
             self.indexed_chunk_ids = set()
 
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        response = self.client.embeddings.create(
-            model=settings.embedding_model,
-            input=texts,
+    def _source_filter(self, source_name: str) -> models.Filter:
+        return models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="source",
+                    match=models.MatchValue(value=source_name),
+                )
+            ]
         )
-        return [item.embedding for item in response.data]
+
+    def embed_texts(self, texts: List[str]) -> List[List[float]]:
+        """Embed texts in batches to avoid exceeding API token limits."""
+        all_embeddings = []
+        for i in range(0, len(texts), EMBED_BATCH_SIZE):
+            batch = texts[i : i + EMBED_BATCH_SIZE]
+            response = self.client.embeddings.create(
+                model=settings.embedding_model,
+                input=batch,
+            )
+            all_embeddings.extend([item.embedding for item in response.data])
+        return all_embeddings
 
     def embed_query(self, query: str) -> List[float]:
         response = self.client.embeddings.create(
@@ -109,14 +127,57 @@ class VectorStore:
 
         return len(new_chunks)
 
+    def delete_source(self, source_name: str) -> int:
+        source_filter = self._source_filter(source_name)
+        chunk_ids_to_remove = set()
+        offset = None
+
+        while True:
+            points, next_offset = self.qdrant.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=source_filter,
+                with_payload=True,
+                with_vectors=False,
+                limit=256,
+                offset=offset,
+            )
+
+            for point in points:
+                payload = point.payload or {}
+                chunk_id = payload.get("chunk_id")
+                if chunk_id:
+                    chunk_ids_to_remove.add(chunk_id)
+
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=models.FilterSelector(filter=source_filter),
+        )
+        self.indexed_chunk_ids.difference_update(chunk_ids_to_remove)
+
+        return len(chunk_ids_to_remove)
+
     def search(self, query: str, top_k: int = 5) -> List[Dict]:
         query_vector = self.embed_query(query)
 
-        results = self.qdrant.search(
-            collection_name=self.collection_name,
-            query_vector=query_vector,
-            limit=top_k,
-        )
+        # Use query_points (qdrant-client >= 1.12) with search fallback
+        try:
+            query_response = self.qdrant.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                limit=top_k,
+            )
+            results = query_response.points
+        except AttributeError:
+            # Fallback for older qdrant-client versions that still have .search()
+            results = self.qdrant.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                limit=top_k,
+            )
 
         return [
             {
