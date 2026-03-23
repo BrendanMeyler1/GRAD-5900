@@ -1,0 +1,42 @@
+[
+  {
+    "id": "q1",
+    "question": "What supply chain risks are shared between NVIDIA and AMD, and how could they affect production?",
+    "ideal_answer": "Both NVIDIA and AMD may face supply chain risks related to semiconductor manufacturing constraints, supplier concentration, component shortages, and geopolitical or logistics disruptions. These risks can delay production, reduce availability of key inputs, and limit the companies' ability to meet customer demand.",
+    "key_entities": ["NVIDIA", "AMD", "Supply Chain", "Production"],
+    "expected_relationships": ["EXPOSES_TO", "AFFECTS", "LINKED_TO"],
+    "sources": ["nvda_10k.pdf", "amd_10k.pdf"]
+  },
+  {
+    "id": "q2",
+    "question": "How does the ETF creation and redemption mechanism help maintain price alignment with NAV?",
+    "ideal_answer": "The ETF creation and redemption mechanism allows authorized participants to exchange baskets of underlying securities for ETF shares and vice versa. This creates arbitrage opportunities when the ETF market price deviates from NAV, which helps bring the ETF price back in line with the value of its underlying holdings.",
+    "key_entities": ["ETF", "NAV", "Authorized Participants", "Creation", "Redemption", "Arbitrage"],
+    "expected_relationships": ["PARTICIPATES_IN", "AFFECTS", "LINKED_TO"],
+    "sources": ["vti_prospectus.pdf"]
+  },
+  {
+    "id": "q3",
+    "question": "How could rising interest rates affect the liquidity of an ETF through its underlying assets?",
+    "ideal_answer": "Rising interest rates can affect the prices and liquidity of underlying assets, especially fixed-income securities, and can increase market volatility. If the underlying assets become harder to trade or reprice quickly, the ETF may also experience wider spreads, more fragile liquidity, and greater deviations between market price and NAV.",
+    "key_entities": ["Interest Rates", "ETF", "Liquidity", "Underlying Assets", "Volatility"],
+    "expected_relationships": ["INFLUENCES", "AFFECTS", "LINKED_TO"],
+    "sources": ["fomc_summary.pdf", "vti_prospectus.pdf"]
+  },
+  {
+    "id": "q4",
+    "question": "What are the risks of high authorized participant concentration during periods of market volatility?",
+    "ideal_answer": "If only a small number of authorized participants support an ETF, market stress or reduced willingness to transact can impair the creation and redemption process. During volatility this may reduce liquidity, widen spreads, and increase the chance that the ETF trades at a premium or discount to NAV.",
+    "key_entities": ["Authorized Participants", "Concentration", "Market Volatility", "Liquidity", "NAV"],
+    "expected_relationships": ["EXPOSES_TO", "AFFECTS", "PARTICIPATES_IN"],
+    "sources": ["vti_prospectus.pdf", "fomc_summary.pdf"]
+  },
+  {
+    "id": "q5",
+    "question": "What are the key entities involved in ETF liquidity and how are they connected?",
+    "ideal_answer": "Key entities involved in ETF liquidity include the issuer, authorized participants, market makers, investors, and the underlying assets. Authorized participants and market makers help support trading and arbitrage, while the quality and liquidity of the underlying assets influence spreads, price efficiency, and the creation and redemption process.",
+    "key_entities": ["Issuer", "Authorized Participants", "Market Makers", "Investors", "Underlying Assets", "Liquidity"],
+    "expected_relationships": ["PARTICIPATES_IN", "AFFECTS", "LINKED_TO", "ISSUES"],
+    "sources": ["vti_prospectus.pdf"]
+  }
+]
