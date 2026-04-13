@@ -1,0 +1,11 @@
+{
+  "trace_id": "1b247b88-b194-44a8-94c8-1c3befe8cadf",
+  "source_trace_id": "1b247b88-b194-44a8-94c8-1c3befe8cadf",
+  "company": "Acme Test Corp",
+  "ats_type": "greenhouse",
+  "listing_id": "synthetic-listing-001",
+  "descriptor_count": 0,
+  "strategy_stats": {},
+  "descriptors": [],
+  "generated_at": "2026-04-11T21:55:48.948545+00:00"
+}

@@ -1,0 +1,54 @@
+{
+  "persona_id": "synthetic-001",
+  "created_at": "2026-04-09T14:00:00Z",
+  "contact": {
+    "full_name": "{{FULL_NAME}}",
+    "email": "{{EMAIL}}",
+    "phone": "{{PHONE}}",
+    "address": "{{ADDRESS}}",
+    "linkedin": "{{LINKEDIN}}",
+    "github": "{{GITHUB}}"
+  },
+  "summary": "8+ years software engineering experience specializing in distributed systems, API design, and cloud infrastructure. Track record of delivering high-throughput services processing millions of events daily.",
+  "skills": {
+    "languages": ["Python", "Go", "TypeScript", "SQL"],
+    "frameworks": ["FastAPI", "Django", "React", "gRPC"],
+    "infrastructure": ["AWS", "Kubernetes", "Docker", "Terraform"],
+    "domains": ["distributed systems", "API design", "data pipelines", "event-driven architecture"]
+  },
+  "experience": [
+    {
+      "employer": "{{EMPLOYER_1}}",
+      "title": "Senior Software Engineer",
+      "start_date": "2022-01",
+      "end_date": "present",
+      "bullets": [
+        "Designed event-driven microservices processing 2M+ events/day with 99.95% uptime",
+        "Reduced API latency by 40% through caching layer redesign using Redis and CDN optimization",
+        "Led migration of monolithic billing service to distributed architecture serving 500K+ customers",
+        "Mentored 4 junior engineers and established team code review standards"
+      ]
+    },
+    {
+      "employer": "{{EMPLOYER_2}}",
+      "title": "Software Engineer",
+      "start_date": "2018-06",
+      "end_date": "2021-12",
+      "bullets": [
+        "Built real-time data pipeline processing 10TB/day using Apache Kafka and Spark",
+        "Developed internal CLI tooling adopted by 50+ engineers across 3 teams",
+        "Implemented automated testing framework reducing regression bugs by 60%"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "{{SCHOOL}}",
+      "degree": "B.S. Computer Science",
+      "graduation_date": "2018-05",
+      "gpa": "3.7"
+    }
+  ],
+  "years_of_experience": 8,
+  "work_authorization": "US Citizen"
+}

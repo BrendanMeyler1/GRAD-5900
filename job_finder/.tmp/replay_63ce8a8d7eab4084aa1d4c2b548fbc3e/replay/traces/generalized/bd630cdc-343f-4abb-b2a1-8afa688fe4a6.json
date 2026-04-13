@@ -1,0 +1,58 @@
+{
+  "trace_id": "bd630cdc-343f-4abb-b2a1-8afa688fe4a6",
+  "source_trace_id": "bd630cdc-343f-4abb-b2a1-8afa688fe4a6",
+  "company": "Acme Corp",
+  "ats_type": "greenhouse",
+  "listing_id": "listing-001",
+  "descriptor_count": 3,
+  "strategy_stats": {
+    "exact_css": 1,
+    "aria_label_match": 1,
+    "label_based_xpath": 1
+  },
+  "descriptors": [
+    {
+      "field_id": "first_name",
+      "label": "First Name",
+      "type": "text_input",
+      "relative_position": "top_form",
+      "aria_label": "First name",
+      "placeholder": "First name",
+      "selector_that_worked": "#first_name",
+      "strategy_used": "exact_css",
+      "confidence": 0.98,
+      "confidence_band": "AUTO_FILL",
+      "pii_level": "LOW",
+      "source": "template"
+    },
+    {
+      "field_id": "education_school",
+      "label": "School / University",
+      "type": "text_input",
+      "relative_position": "middle_form",
+      "aria_label": "School",
+      "placeholder": "University",
+      "selector_that_worked": "[name=\"education_school\"]",
+      "strategy_used": "aria_label_match",
+      "confidence": 0.71,
+      "confidence_band": "FLAG",
+      "pii_level": "LOW",
+      "source": "llm_interpreted"
+    },
+    {
+      "field_id": "salary_expectation",
+      "label": "Expected Salary (USD)",
+      "type": "text_input",
+      "relative_position": "bottom_form",
+      "aria_label": null,
+      "placeholder": null,
+      "selector_that_worked": "[name=\"salary_expectation\"]",
+      "strategy_used": "label_based_xpath",
+      "confidence": 0.42,
+      "confidence_band": "ESCALATE",
+      "pii_level": "HIGH",
+      "source": "template_resolved"
+    }
+  ],
+  "generated_at": "2026-04-13T18:59:18.922290+00:00"
+}

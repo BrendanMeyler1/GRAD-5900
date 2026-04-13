@@ -1,0 +1,15 @@
+{
+  "$extends": "_base.json",
+  "ats_type": "workday",
+  "base_url": "metacareers.com",
+  "fields": [
+    {
+      "field_id": "referral_name",
+      "label": "Who referred you?",
+      "pii_level": "NONE",
+      "type": "text_input",
+      "selector": "div[data-automation-id='sourceTrackingReferral'] input",
+      "value": "N/A"
+    }
+  ]
+}

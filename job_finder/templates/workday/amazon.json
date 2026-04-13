@@ -1,0 +1,15 @@
+{
+  "$extends": "_base.json",
+  "ats_type": "workday",
+  "base_url": "amazon.jobs",
+  "fields": [
+    {
+      "field_id": "veteran_status",
+      "label": "Veteran Status",
+      "pii_level": "NONE",
+      "type": "dropdown",
+      "selector": "div[data-automation-id='veteranStatus'] select",
+      "value": "I am not a protected veteran"
+    }
+  ]
+}

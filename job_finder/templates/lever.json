@@ -1,0 +1,79 @@
+{
+  "ats_type": "lever",
+  "template_version": "v1",
+  "replay_trace_id": "lever_general_v1",
+  "fields": [
+    {
+      "field_id": "name",
+      "label": "Full Name",
+      "type": "text_input",
+      "selector": "input[name=\"name\"]",
+      "value": "{{FULL_NAME}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "email",
+      "label": "Email",
+      "type": "text_input",
+      "selector": "input[name=\"email\"]",
+      "value": "{{EMAIL}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "phone",
+      "label": "Phone",
+      "type": "text_input",
+      "selector": "input[name=\"phone\"]",
+      "value": "{{PHONE}}",
+      "pii_level": "MEDIUM"
+    },
+    {
+      "field_id": "location",
+      "label": "Location",
+      "type": "text_input",
+      "selector": "input[name=\"location\"]",
+      "value": "{{ADDRESS}}",
+      "pii_level": "MEDIUM"
+    },
+    {
+      "field_id": "linkedin",
+      "label": "LinkedIn",
+      "type": "text_input",
+      "selector": "input[name=\"urls[LinkedIn]\"]",
+      "value": "{{LINKEDIN}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "github",
+      "label": "GitHub",
+      "type": "text_input",
+      "selector": "input[name=\"urls[GitHub]\"]",
+      "value": "{{GITHUB}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "resume_upload",
+      "label": "Resume",
+      "type": "file_upload",
+      "selector": "input[type=\"file\"][name=\"resume\"]",
+      "value": "generated_resume.pdf",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "cover_letter_upload",
+      "label": "Cover Letter",
+      "type": "file_upload",
+      "selector": "input[type=\"file\"][name=\"coverLetter\"]",
+      "value": "generated_cover_letter.pdf",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "work_authorization",
+      "label": "Work Authorization",
+      "type": "text_input",
+      "selector": "input[name=\"workAuthorization\"]",
+      "value": "{{WORK_AUTHORIZATION}}",
+      "pii_level": "MEDIUM"
+    }
+  ]
+}

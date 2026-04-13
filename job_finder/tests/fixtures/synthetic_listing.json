@@ -1,0 +1,44 @@
+{
+  "listing_id": "synthetic-listing-001",
+  "source": "greenhouse",
+  "source_url": "https://boards.greenhouse.io/acmetestcorp/jobs/12345",
+  "company": {
+    "name": "Acme Test Corp",
+    "size": "500-1000",
+    "industry": "fintech",
+    "careers_url": "https://acmetestcorp.com/careers"
+  },
+  "role": {
+    "title": "Senior Backend Engineer",
+    "department": "Platform",
+    "location": "Remote US",
+    "salary_range": {"min": 160000, "max": 200000, "currency": "USD"},
+    "posted_date": "2026-04-06",
+    "description_text": "We are looking for a Senior Backend Engineer to join our Platform team. You will be responsible for designing and building scalable distributed systems that power our financial products. The ideal candidate has deep experience with Python or Go, event-driven architectures, and cloud infrastructure.",
+    "requirements": [
+      "5+ years professional experience with Python or Go",
+      "Experience designing and operating distributed systems at scale",
+      "Strong understanding of event-driven architecture patterns",
+      "AWS or GCP proficiency (EC2, ECS/EKS, Lambda, S3, RDS)",
+      "Experience with API design (REST, gRPC)",
+      "Familiarity with infrastructure-as-code (Terraform, CloudFormation)",
+      "Strong communication skills and collaborative mindset"
+    ]
+  },
+  "alive_score": {
+    "composite": 0.85,
+    "signals": {
+      "posting_freshness": 0.95,
+      "recruiter_activity": 0.80,
+      "headcount_trend": 0.70,
+      "financial_health": 0.90,
+      "url_provenance": 1.0,
+      "duplicate_check": 1.0,
+      "portal_check": 1.0
+    },
+    "flags": []
+  },
+  "ats_type": "greenhouse",
+  "apply_url": "https://boards.greenhouse.io/acmetestcorp/jobs/12345#app",
+  "scraped_at": "2026-04-09T10:00:00Z"
+}

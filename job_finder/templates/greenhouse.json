@@ -1,0 +1,72 @@
+{
+  "ats_type": "greenhouse",
+  "template_version": "v3",
+  "replay_trace_id": "greenhouse_general_v3",
+  "fields": [
+    {
+      "field_id": "first_name",
+      "label": "First Name",
+      "type": "text_input",
+      "selector": "#first_name",
+      "value": "{{FIRST_NAME}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "last_name",
+      "label": "Last Name",
+      "type": "text_input",
+      "selector": "#last_name",
+      "value": "{{LAST_NAME}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "email",
+      "label": "Email",
+      "type": "text_input",
+      "selector": "#email",
+      "value": "{{EMAIL}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "phone",
+      "label": "Phone",
+      "type": "text_input",
+      "selector": "#phone",
+      "value": "{{PHONE}}",
+      "pii_level": "MEDIUM"
+    },
+    {
+      "field_id": "country",
+      "label": "Country",
+      "type": "select",
+      "selector": "#country",
+      "value": "United States",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "candidate_location",
+      "label": "Location (City)",
+      "type": "select",
+      "selector": "#candidate-location",
+      "value": "{{LOCATION}}",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "resume_upload",
+      "label": "Resume",
+      "type": "file_upload",
+      "selector": "input#resume[type=\"file\"]",
+      "value": "generated_resume.docx",
+      "pii_level": "LOW"
+    },
+    {
+      "field_id": "cover_letter_upload",
+      "label": "Cover Letter",
+      "type": "file_upload",
+      "selector": "input#cover_letter[type=\"file\"]",
+      "value": "generated_cover_letter.docx",
+      "pii_level": "LOW",
+      "required": false
+    }
+  ]
+}

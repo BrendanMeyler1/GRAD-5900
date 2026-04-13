@@ -1,0 +1,42 @@
+# Environment
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# PII & sensitive data
+data/raw/
+pii_vault.db
+account_vault.db
+company_memory.db
+
+# Feedback & logs
+feedback/*.json
+feedback/failures.db
+feedback/outcomes.db
+replay/traces/*
+!replay/traces/.gitkeep
+*.log
+
+# Databases
+data/checkpoints.db
+data/chroma/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (dashboard)
+dashboard/node_modules/
+dashboard/dist/
+
+# Distribution
+*.egg-info/
+dist/
+build/

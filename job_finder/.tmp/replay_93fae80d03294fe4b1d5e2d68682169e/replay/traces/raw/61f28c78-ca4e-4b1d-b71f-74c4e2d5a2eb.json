@@ -1,0 +1,86 @@
+{
+  "trace_id": "61f28c78-ca4e-4b1d-b71f-74c4e2d5a2eb",
+  "application_id": "app-001",
+  "listing_id": "listing-001",
+  "ats_type": "greenhouse",
+  "company": "Acme Corp",
+  "listing": {
+    "listing_id": "listing-001",
+    "ats_type": "greenhouse",
+    "company": {
+      "name": "Acme Corp"
+    },
+    "apply_url": "https://boards.greenhouse.io/acme/jobs/001#app"
+  },
+  "fill_plan": {
+    "fields": [
+      {
+        "field_id": "first_name",
+        "label": "First Name",
+        "type": "text_input",
+        "selector": "#first_name",
+        "selector_strategy": "exact_css",
+        "confidence": 0.98,
+        "pii_level": "LOW",
+        "source": "template"
+      },
+      {
+        "field_id": "education_school",
+        "label": "School / University",
+        "type": "text_input",
+        "selector": "[name=\"education_school\"]",
+        "selector_strategy": "aria_label_match",
+        "confidence": 0.71,
+        "pii_level": "LOW",
+        "source": "llm_interpreted"
+      },
+      {
+        "field_id": "salary_expectation",
+        "label": "Expected Salary (USD)",
+        "type": "text_input",
+        "selector": "[name=\"salary_expectation\"]",
+        "selector_strategy": "label_based_xpath",
+        "confidence": 0.42,
+        "pii_level": "HIGH",
+        "source": "template_resolved"
+      }
+    ]
+  },
+  "execution": {
+    "executed_actions": [
+      {
+        "field_id": "first_name",
+        "action": "fill_text",
+        "selector": "#first_name",
+        "strategy_used": "exact_css",
+        "confidence": 0.98
+      },
+      {
+        "field_id": "education_school",
+        "action": "fill_text",
+        "selector": "[name=\"education_school\"]",
+        "strategy_used": "aria_label_match",
+        "confidence": 0.71
+      }
+    ]
+  },
+  "dom_snapshot": {
+    "fields": [
+      {
+        "selector": "#first_name",
+        "label": "First Name",
+        "input_type": "text_input",
+        "aria_label": "First name",
+        "placeholder": "First name"
+      },
+      {
+        "selector": "[name=\"education_school\"]",
+        "label": "School / University",
+        "input_type": "text_input",
+        "aria_label": "School",
+        "placeholder": "University"
+      }
+    ]
+  },
+  "captured_at": "2026-04-10T02:34:29.258193+00:00"
+}

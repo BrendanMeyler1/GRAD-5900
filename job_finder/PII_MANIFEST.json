@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "description": "PII token manifest — documents what personal data tokens exist, how they are stored, and the privacy guarantees.",
+  "tokens": {
+    "{{FULL_NAME}}": {
+      "description": "Legal full name",
+      "sensitivity": "LOW"
+    },
+    "{{FIRST_NAME}}": {
+      "description": "First/given name",
+      "sensitivity": "LOW"
+    },
+    "{{LAST_NAME}}": {
+      "description": "Last/family name",
+      "sensitivity": "LOW"
+    },
+    "{{EMAIL}}": {
+      "description": "Contact email address",
+      "sensitivity": "LOW"
+    },
+    "{{PHONE}}": {
+      "description": "Phone number",
+      "sensitivity": "MEDIUM"
+    },
+    "{{ADDRESS}}": {
+      "description": "Mailing address",
+      "sensitivity": "MEDIUM"
+    },
+    "{{LINKEDIN}}": {
+      "description": "LinkedIn profile URL",
+      "sensitivity": "LOW"
+    },
+    "{{GITHUB}}": {
+      "description": "GitHub profile URL",
+      "sensitivity": "LOW"
+    },
+    "{{SCHOOL}}": {
+      "description": "Education institution (canonical + variants via Normalizer)",
+      "sensitivity": "LOW"
+    },
+    "{{EMPLOYER_N}}": {
+      "description": "Employer names (N = index, canonical + variants via Normalizer)",
+      "sensitivity": "LOW"
+    },
+    "{{WORK_AUTH}}": {
+      "description": "Work authorization status",
+      "sensitivity": "MEDIUM"
+    },
+    "{{SSN}}": {
+      "description": "Social Security Number",
+      "sensitivity": "HIGH"
+    },
+    "{{DOB}}": {
+      "description": "Date of birth",
+      "sensitivity": "HIGH"
+    },
+    "{{GOV_ID}}": {
+      "description": "Government-issued ID number",
+      "sensitivity": "HIGH"
+    },
+    "{{SALARY_HISTORY}}": {
+      "description": "Previous salary / compensation history",
+      "sensitivity": "HIGH"
+    }
+  },
+  "storage": "Local encrypted SQLite (Fernet symmetric encryption)",
+  "remote_exposure": "NONE — remote LLMs never see resolved PII values",
+  "local_model": "Ollama (Phi-3 / Llama 3) handles PII injection on localhost only",
+  "normalization": "School and company names stored with canonical + variant forms via pii/normalizer.py",
+  "access_levels": {
+    "LOW": "Auto-fill without prompting",
+    "MEDIUM": "Auto-fill with notification to user",
+    "HIGH": "Manual approval required before any use"
+  }
+}
