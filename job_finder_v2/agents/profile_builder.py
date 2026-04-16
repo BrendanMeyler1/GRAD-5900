@@ -169,10 +169,10 @@ Return ONLY the JSON object.
         log.info(
             "profile_builder.extract_complete",
             extra={
-                "name": (extracted.first_name or "") + " " + (extracted.last_name or ""),
-                "education": len(extracted.education or []),
-                "experience": len(extracted.experience or []),
-                "skills": len(extracted.skills or []),
+                "candidate_name": (extracted.first_name or "") + " " + (extracted.last_name or ""),
+                "education_count": len(extracted.education or []),
+                "experience_count": len(extracted.experience or []),
+                "skills_count": len(extracted.skills or []),
             },
         )
         return extracted
