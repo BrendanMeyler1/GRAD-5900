@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { UploadCloud } from "lucide-react";
 import { useProfile } from "../../hooks/useProfile";
 import clsx from "clsx";
 
@@ -149,6 +151,14 @@ export default function ProfileCompletionBar() {
               </ul>
             </>
           )}
+          <Link
+            to="/onboard"
+            onClick={() => setOpen(false)}
+            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            Upload / replace resume
+          </Link>
         </div>
       )}
     </div>

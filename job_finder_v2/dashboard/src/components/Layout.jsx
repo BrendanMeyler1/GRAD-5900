@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Search, ClipboardList, MessageSquare } from "lucide-react";
+import { Search, ClipboardList, MessageSquare, UploadCloud } from "lucide-react";
 import clsx from "clsx";
 import { usePendingApplications } from "../hooks/useApplications";
 import ProfileCompletionBar from "./profile/ProfileCompletionBar";
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "/discover", label: "Discover", icon: Search },
   { to: "/apply", label: "Apply", icon: ClipboardList, showBadge: true },
   { to: "/chat", label: "Chat", icon: MessageSquare },
+  { to: "/onboard", label: "Upload Resume", icon: UploadCloud },
 ];
 
 export default function Layout() {
