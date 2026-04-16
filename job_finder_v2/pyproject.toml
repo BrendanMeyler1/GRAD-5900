@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "job-finder-v2"
+version = "2.0.0"
+description = "AI-powered job application automation with MCP, multi-agent orchestration, and human-in-the-loop review"
+requires-python = ">=3.11"
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning:pydantic",
+    "ignore::DeprecationWarning:stagehand",
+]
+
+# ── mypy ──────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = false
+no_implicit_optional = true
+files = [
+    "config.py",
+    "logging_config.py",
+    "pipeline.py",
+    "db/",
+    "llm/",
+    "agents/",
+    "scrapers/",
+    "filler/",
+    "memory/",
+    "mcp_servers/",
+    "api/",
+    "utils/",
+    "browser/",
+]
+
+# ── ruff ──────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in default arguments (FastAPI pattern)
+    "SIM117", # use single with statement (readability preference)
+]
+
+[tool.ruff.isort]
+known-first-party = ["config", "db", "llm", "agents", "scrapers", "filler", "memory", "mcp_servers", "api", "utils", "browser"]
