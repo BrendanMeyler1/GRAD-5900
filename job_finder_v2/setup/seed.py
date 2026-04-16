@@ -27,8 +27,14 @@ import logging
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from config import settings
+# Ensure project root is on sys.path when run as `python setup/seed.py`
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
+from config import settings  # noqa: E402
 from db.encryption import get_encryptor
 from db.schema import init_db
 from db.store import Store
