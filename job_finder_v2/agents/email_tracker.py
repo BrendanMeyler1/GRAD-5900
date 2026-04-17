@@ -110,7 +110,27 @@ class EmailTracker:
         raw_messages: list[dict[str, Any]] = []
         try:
             with IMAPClient(settings.imap_host, port=settings.imap_port, ssl=True) as client:
-                client.login(settings.outlook_email, settings.outlook_app_password)
+                try:
+                    client.login(settings.outlook_email, settings.outlook_app_password)
+                except Exception as login_exc:  # noqa: BLE001
+                    err = str(login_exc)
+                    # Microsoft has disabled IMAP Basic Auth for personal Outlook.com
+                    # accounts — a proper fix requires OAuth2 (MSAL). Log a concise
+                    # warning instead of a full traceback; the app keeps running.
+                    if "BasicAuthBlocked" in err or "AuthFailed" in err:
+                        log.warning(
+                            "email_tracker.basic_auth_blocked",
+                            extra={
+                                "host": settings.imap_host,
+                                "hint": "Microsoft blocks IMAP Basic Auth for personal Outlook accounts. Unset OUTLOOK_EMAIL in .env to silence, or switch to an OAuth2-enabled mailbox.",
+                            },
+                        )
+                    else:
+                        log.warning(
+                            "email_tracker.login_failed",
+                            extra={"host": settings.imap_host, "error": err[:200]},
+                        )
+                    return []
                 client.select_folder("INBOX", readonly=True)
                 uids = client.search(["SINCE", since.date()])
                 if not uids:
@@ -130,10 +150,10 @@ class EmailTracker:
                             "internal_date": data.get(b"INTERNALDATE"),
                         }
                     )
-        except Exception as exc:  # noqa: BLE001 — network/auth issues
-            log.exception(
+        except Exception as exc:  # noqa: BLE001 — network/other issues
+            log.warning(
                 "email_tracker.imap_error",
-                extra={"host": settings.imap_host, "error": str(exc)},
+                extra={"host": settings.imap_host, "error": str(exc)[:200]},
             )
             return []
 

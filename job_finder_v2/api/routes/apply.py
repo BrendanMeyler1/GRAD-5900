@@ -69,7 +69,7 @@ async def start_shadow(
 
     async def _run() -> None:
         try:
-            await registry.update(task_id, status="running", progress=0.1)
+            await registry.update(task_id, progress="tailoring resume + filling form")
             app = await pipeline.run_application(job_id=job_id, mode="shadow")
             await registry.complete(
                 task_id,
@@ -118,7 +118,7 @@ async def approve_application(
 
     async def _run() -> None:
         try:
-            await registry.update(task_id, status="running", progress=0.1)
+            await registry.update(task_id, progress="submitting live")
             updated = await pipeline.run_application(
                 job_id=app.job_id, mode="live", existing_app_id=app_id
             )

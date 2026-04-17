@@ -4,35 +4,45 @@ import { UploadCloud } from "lucide-react";
 import { useProfile } from "../../hooks/useProfile";
 import clsx from "clsx";
 
-const REQUIRED_FIELDS = [
-  { key: "name", label: "Name" },
-  { key: "email", label: "Email" },
-  { key: "phone", label: "Phone number" },
-  { key: "experience", label: "Work experience" },
-  { key: "education", label: "Education" },
-  { key: "skills", label: "Skills" },
-  { key: "target_role", label: "Target role" },
-  { key: "location", label: "Location preference" },
+// Labels must line up with the structure returned by GET /api/profile
+// (FullProfile): { profile: UserProfile, experience: [], education: [],
+// skills: [], qa: [] }.
+const ALL_FIELDS = [
+  "Name",
+  "Email",
+  "Phone number",
+  "Work experience",
+  "Education",
+  "Skills",
+  "Location",
+  "Salary range",
+  "Work style",
 ];
 
-function getCompletionData(profile) {
-  if (!profile) return { percent: 0, missing: REQUIRED_FIELDS.map((f) => f.label) };
-
-  const missing = [];
-  for (const field of REQUIRED_FIELDS) {
-    const value = profile[field.key];
-    if (
-      value === undefined ||
-      value === null ||
-      value === "" ||
-      (Array.isArray(value) && value.length === 0)
-    ) {
-      missing.push(field.label);
-    }
+function getCompletionData(fullProfile) {
+  if (!fullProfile) {
+    return { percent: 0, missing: [...ALL_FIELDS] };
   }
 
-  const filled = REQUIRED_FIELDS.length - missing.length;
-  const percent = Math.round((filled / REQUIRED_FIELDS.length) * 100);
+  const p = fullProfile.profile || {};
+  const missing = [];
+
+  if (!p.first_name || !p.last_name) missing.push("Name");
+  if (!p.email) missing.push("Email");
+  if (!p.phone) missing.push("Phone number");
+  if (!fullProfile.experience || fullProfile.experience.length === 0)
+    missing.push("Work experience");
+  if (!fullProfile.education || fullProfile.education.length === 0)
+    missing.push("Education");
+  if (!fullProfile.skills || fullProfile.skills.length === 0)
+    missing.push("Skills");
+  if (!p.city || !p.state) missing.push("Location");
+  if (p.target_salary_min == null || p.target_salary_max == null)
+    missing.push("Salary range");
+  if (!p.remote_preference) missing.push("Work style");
+
+  const filled = ALL_FIELDS.length - missing.length;
+  const percent = Math.round((filled / ALL_FIELDS.length) * 100);
 
   return { percent, missing };
 }

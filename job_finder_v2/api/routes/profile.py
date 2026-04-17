@@ -159,16 +159,49 @@ async def upload_resume(
     store.upsert_profile({"resume_file_path": str(dest), "resume_raw_text": text})
     extracted = await profile_builder.extract_from_resume(text)
 
+    name = f"{extracted.first_name or ''} {extracted.last_name or ''}".strip() or None
+    skills_list = [
+        s.get("name", "") for s in (extracted.skills or []) if s.get("name")
+    ]
+    education_list = [
+        {
+            "degree": e.get("degree"),
+            "institution": e.get("institution"),
+            "field": e.get("field"),
+            "year": e.get("graduation_year"),
+        }
+        for e in (extracted.education or [])
+    ]
+    experience_list = [
+        {
+            "title": x.get("title"),
+            "company": x.get("company"),
+            "duration": (
+                f"{x.get('start_date') or ''} – "
+                f"{'Present' if x.get('is_current') else (x.get('end_date') or '')}"
+            ).strip(" –"),
+        }
+        for x in (extracted.experience or [])
+    ]
+
     return {
         "file_path": str(dest),
         "text_chars": len(text),
+        # Top-level fields consumed by the dashboard StepPreview
+        "name": name,
+        "email": extracted.email,
+        "phone": extracted.phone,
+        "skills": skills_list,
+        "education": education_list,
+        "experience": experience_list,
+        # Legacy shape (kept for tests / scripted callers)
         "extracted": {
-            "name": f"{extracted.first_name or ''} {extracted.last_name or ''}".strip(),
+            "name": name or "",
             "email": extracted.email,
             "phone": extracted.phone,
-            "education_count": len(extracted.education or []),
-            "experience_count": len(extracted.experience or []),
-            "skills_count": len(extracted.skills or []),
+            "education_count": len(education_list),
+            "experience_count": len(experience_list),
+            "skills_count": len(skills_list),
         },
     }
 
