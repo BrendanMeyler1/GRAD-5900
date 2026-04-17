@@ -2,10 +2,51 @@ import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, FileText, CheckCircle, ArrowRight } from "lucide-react";
 import clsx from "clsx";
-import { useUploadResume, useUpdateProfile } from "../../hooks/useProfile";
+import { useUploadResume } from "../../hooks/useProfile";
 import { useToast } from "../../hooks/useToast";
+import api from "../../api/client";
 import LoadingSpinner from "../shared/LoadingSpinner";
 import ToastContainer from "../shared/ToastContainer";
+
+// ─── Map onboarding answers → ProfileUpdate fields ──────────────────────────
+function parseSalaryRange(text) {
+  if (!text) return { target_salary_min: null, target_salary_max: null };
+  // Match things like "$120k-$160k", "120000-160000", "$120,000 to $160,000"
+  const normalised = text.toLowerCase().replace(/[\s,$]/g, "");
+  const nums = [...normalised.matchAll(/(\d+(?:\.\d+)?)(k)?/g)].map((m) => {
+    const n = parseFloat(m[1]);
+    return m[2] === "k" ? Math.round(n * 1000) : Math.round(n);
+  });
+  if (nums.length === 0) return { target_salary_min: null, target_salary_max: null };
+  const min = nums[0];
+  const max = nums.length > 1 ? nums[1] : nums[0];
+  return { target_salary_min: min, target_salary_max: max };
+}
+
+function mapWorkStyle(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (t.includes("remote")) return "remote";
+  if (t.includes("hybrid")) return "hybrid";
+  if (t.includes("on-site") || t.includes("onsite") || t.includes("in person") || t.includes("in office")) return "onsite";
+  return null;
+}
+
+function parseLocation(text) {
+  if (!text) return { city: null, state: null, willing_to_relocate: null };
+  const lower = text.toLowerCase();
+  const willing_to_relocate =
+    lower.includes("relocat") || lower.includes("anywhere") || lower.includes("willing to move")
+      ? true
+      : null;
+  // Very light parse: first comma-delimited chunk → city, second → state
+  const parts = text.split(",").map((s) => s.trim()).filter(Boolean);
+  return {
+    city: parts[0] || null,
+    state: parts[1] || null,
+    willing_to_relocate,
+  };
+}
 
 const ACCEPTED_TYPES = [
   "application/pdf",
@@ -438,11 +479,11 @@ function StepIndicator({ step }) {
 export default function OnboardView() {
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const updateProfile = useUpdateProfile();
 
   const [step, setStep] = useState(1);
   const [profileData, setProfileData] = useState(null);
   const [needsFix, setNeedsFix] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleUploadComplete = useCallback((data) => {
     setProfileData(data);
@@ -457,29 +498,65 @@ export default function OnboardView() {
   }, []);
 
   const handleQuestionsComplete = useCallback(
-    (answers) => {
-      const payload = { ...answers };
-      if (needsFix) {
-        payload._needs_review = true;
-      }
+    async (answers) => {
+      // Map free-text answers → valid ProfileUpdate fields
+      const { target_salary_min, target_salary_max } = parseSalaryRange(
+        answers.salary_range || ""
+      );
+      const remote_preference = mapWorkStyle(answers.work_style || "");
+      const { city, state, willing_to_relocate } = parseLocation(
+        answers.location || ""
+      );
 
-      updateProfile.mutate(payload, {
-        onSuccess: () => {
-          addToast({
-            message: "Profile set up successfully! Let's find you some jobs.",
-            type: "success",
-          });
-          navigate("/discover", { replace: true });
-        },
-        onError: () => {
-          addToast({
-            message: "Failed to save your preferences. Please try again.",
-            type: "error",
-          });
-        },
-      });
+      const profilePayload = {};
+      if (target_salary_min !== null) profilePayload.target_salary_min = target_salary_min;
+      if (target_salary_max !== null) profilePayload.target_salary_max = target_salary_max;
+      if (remote_preference !== null) profilePayload.remote_preference = remote_preference;
+      if (city) profilePayload.city = city;
+      if (state) profilePayload.state = state;
+      if (willing_to_relocate !== null) profilePayload.willing_to_relocate = willing_to_relocate;
+
+      // Persist raw answers as Q&A notes for the orchestrator
+      const qaPairs = [
+        { q: "What type of role are you looking for?", a: answers.target_role, cat: "target_role" },
+        { q: "Do you have a location preference?", a: answers.location, cat: "location" },
+        { q: "What is your preferred work style?", a: answers.work_style, cat: "work_style" },
+        { q: "What is your target salary range?", a: answers.salary_range, cat: "salary" },
+      ].filter((p) => p.a && p.a.trim());
+
+      setIsSubmitting(true);
+      try {
+        // 1) Save Q&A notes in parallel (non-blocking errors)
+        await Promise.allSettled(
+          qaPairs.map((p) =>
+            api.post("/api/profile/qa", {
+              question: p.q,
+              answer: p.a,
+              category: p.cat,
+            })
+          )
+        );
+
+        // 2) Update structured profile fields (only if we extracted at least one)
+        if (Object.keys(profilePayload).length > 0) {
+          await api.put("/api/profile", profilePayload);
+        }
+
+        addToast({
+          message: "Profile set up successfully! Let's find you some jobs.",
+          type: "success",
+        });
+        navigate("/discover", { replace: true });
+      } catch (err) {
+        addToast({
+          message: "Failed to save your preferences. Please try again.",
+          type: "error",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     },
-    [updateProfile, addToast, navigate, needsFix]
+    [addToast, navigate]
   );
 
   return (
@@ -520,7 +597,7 @@ export default function OnboardView() {
           {step === 3 && (
             <StepQuestions
               onComplete={handleQuestionsComplete}
-              isSubmitting={updateProfile.isPending}
+              isSubmitting={isSubmitting}
             />
           )}
         </div>
