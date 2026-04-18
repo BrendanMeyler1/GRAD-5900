@@ -44,7 +44,7 @@ async def sync_email(
 
     async def _run() -> None:
         try:
-            await registry.update(task_id, status="running", progress=0.1)
+            await registry.update(task_id, progress="scanning inbox")
             events = await email_tracker.sync(since_days=since_days)
             await registry.complete(
                 task_id,

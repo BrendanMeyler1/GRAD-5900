@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import SearchBar from "./SearchBar";
 import JobCard from "./JobCard";
 import JobDetail from "./JobDetail";
@@ -28,18 +28,23 @@ export default function DiscoverView() {
   // Poll task status while search is running
   const { task: searchTask, isPolling } = useTaskStatus(searchTaskId);
 
-  // When the task completes, refresh jobs
-  const prevTaskStatus = searchTask?.status;
-  if (prevTaskStatus === "completed" && searchTaskId) {
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
-  }
+  // When the task completes, refresh jobs — must be in useEffect to avoid
+  // calling invalidateQueries on every render while status === "completed".
+  useEffect(() => {
+    if (searchTask?.status === "completed" && searchTaskId) {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      setSearchTaskId(null); // stop polling
+    }
+  }, [searchTask?.status, searchTaskId, queryClient]);
 
+  // SearchBar calls onSearch with a single options object:
+  // { query, location, source, min_fit_score, remote_only }
   const handleSearch = useCallback(
-    async (query, location, filters) => {
+    async ({ query, location, source, min_fit_score, remote_only } = {}) => {
       setSearchTaskId(null);
       try {
         const result = await searchMutation.mutateAsync({
-          query,
+          query: query || "",
           location: location || "",
           limit: 30,
         });
@@ -49,9 +54,13 @@ export default function DiscoverView() {
       } catch (err) {
         console.error("Search failed:", err);
       }
-      if (filters) {
-        setActiveFilters((prev) => ({ ...prev, ...filters }));
-      }
+      // Apply any filters that came alongside the search
+      setActiveFilters((prev) => ({
+        ...prev,
+        ...(source ? { source: source.toLowerCase() } : {}),
+        ...(min_fit_score != null ? { min_fit_score } : {}),
+        ...(remote_only != null ? { remote_only } : {}),
+      }));
     },
     [searchMutation]
   );
@@ -64,7 +73,7 @@ export default function DiscoverView() {
     <div className="flex h-full flex-col">
       {/* Search bar */}
       <div className="border-b border-slate-700/50 bg-slate-900 px-6 py-4">
-        <SearchBar onSearch={handleSearch} isSearching={isSearching} />
+        <SearchBar onSearch={handleSearch} isLoading={isSearching} />
       </div>
 
       {/* Main content: list + detail pane */}

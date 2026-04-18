@@ -28,7 +28,13 @@ const TABS = [
 /* ------------------------------------------------------------------ */
 
 function ScreenshotsTab({ application }) {
-  const screenshots = application?.screenshots ?? [];
+  // shadow_screenshots is an array of server-side file paths.
+  // Transform each path to an API URL the browser can fetch.
+  const rawPaths = application?.shadow_screenshots ?? [];
+  const appId = application?.id ?? "";
+  const screenshots = rawPaths.map(
+    (p) => `/api/apply/${appId}/screenshot/${p.split(/[\\/]/).pop()}`
+  );
   const fillLog = application?.fill_log ?? [];
   const [idx, setIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -120,8 +126,9 @@ function ScreenshotsTab({ application }) {
 
 function ResumeDiffTab({ application }) {
   const { profile } = useProfile();
-  const original = profile?.resume_raw_text ?? "";
-  const tailored = application?.tailored_resume_text ?? "";
+  // useProfile returns FullProfile: { profile: UserProfile, experience, ... }
+  const original = profile?.profile?.resume_raw_text ?? "";
+  const tailored = application?.resume_tailored_text ?? "";
 
   const diffParts = useMemo(() => {
     if (!original && !tailored) return [];
@@ -193,14 +200,20 @@ function CoverLetterTab({ application }) {
   const coverLetterRef = useRef(null);
   const [expandedQ, setExpandedQ] = useState(new Set());
   const answerRefs = useRef({});
-  const customQA = application?.custom_qa ?? [];
+
+  // Backend stores custom_qa as dict { question: answer }.
+  // Convert to array of { question, answer } for rendering.
+  const rawQA = application?.custom_qa ?? {};
+  const customQA = Array.isArray(rawQA)
+    ? rawQA
+    : Object.entries(rawQA).map(([question, answer]) => ({ question, answer }));
 
   const handleCoverLetterBlur = useCallback(() => {
     const value = coverLetterRef.current?.value;
-    if (value == null || value === application?.cover_letter) return;
+    if (value == null || value === application?.cover_letter_text) return;
     updateMutation.mutate({
       appId: application.id,
-      data: { cover_letter: value },
+      data: { cover_letter_text: value },
     });
   }, [application, updateMutation]);
 
@@ -217,11 +230,13 @@ function CoverLetterTab({ application }) {
     (index) => {
       const value = answerRefs.current[index]?.value;
       if (value == null) return;
+      // Rebuild as dict { question: answer } to match backend schema
       const updated = [...customQA];
       updated[index] = { ...updated[index], answer: value };
+      const dictForm = Object.fromEntries(updated.map((qa) => [qa.question, qa.answer]));
       updateMutation.mutate({
         appId: application.id,
-        data: { custom_qa: updated },
+        data: { custom_qa: dictForm },
       });
     },
     [application, customQA, updateMutation]
@@ -236,7 +251,7 @@ function CoverLetterTab({ application }) {
         </label>
         <textarea
           ref={coverLetterRef}
-          defaultValue={application?.cover_letter ?? ""}
+          defaultValue={application?.cover_letter_text ?? ""}
           onBlur={handleCoverLetterBlur}
           rows={8}
           className="w-full resize-y rounded-lg border border-slate-700 bg-slate-900 p-3 text-sm text-slate-200 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -340,10 +355,10 @@ export default function ReviewPanel({ application, onClose }) {
         <div className="flex items-start justify-between border-b border-slate-700 px-6 py-4">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-bold text-slate-100">
-              {application.company}
+              {application.job?.company ?? "Unknown Company"}
               <span className="mx-2 text-slate-600">&mdash;</span>
               <span className="font-normal text-slate-300">
-                {application.job_title}
+                {application.job?.title ?? "Untitled Position"}
               </span>
             </h2>
           </div>

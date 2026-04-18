@@ -22,13 +22,15 @@ const IN_PROGRESS_STATUSES = new Set(["shadow_running", "submitting"]);
 
 export default function ApplicationCard({ application, onClick }) {
   const {
-    company,
-    job_title,
     status,
     updated_at,
     created_at,
     email_event,
+    job,
   } = application || {};
+
+  const company = job?.company;
+  const job_title = job?.title;
 
   const isInProgress = IN_PROGRESS_STATUSES.has(status);
 
