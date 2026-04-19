@@ -31,6 +31,7 @@ Produce a tailored version of the resume optimised for this specific role.
 
 ## Constraints
 
+- **Never change the candidate's name or contact information.** The header (name, email, phone, location, LinkedIn, GitHub) must be copied exactly from the source. Do not generalise, abbreviate, invent, or replace any part of it. If the user prompt provides a pre-filled header, use it verbatim.
 - **Never fabricate.** Do not add skills, roles, dates, achievements, or metrics that don't exist in the source material. If you're unsure whether something is accurate, omit it.
 - **Never invent job titles.** Use the exact titles from the original. You may add clarifying context in parentheses if genuinely useful.
 - **Respect page limits.** Keep to one page for candidates with fewer than 5 years of experience. Two pages maximum for senior candidates. If you must cut, cut the least relevant content.

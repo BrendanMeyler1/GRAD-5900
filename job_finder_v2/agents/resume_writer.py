@@ -74,6 +74,17 @@ class ResumeWriter:
         lack that content too.
         """
         base_resume = profile.profile.resume_raw_text or profile.to_context_string()
+        p = profile.profile
+
+        # Build contact line from actual profile fields so Claude can't invent them
+        contact_parts = [x for x in [p.email, p.phone] if x]
+        if p.city or p.state:
+            contact_parts.append(", ".join(filter(None, [p.city, p.state])))
+        if p.linkedin_url:
+            contact_parts.append(p.linkedin_url)
+        if p.github_url:
+            contact_parts.append(p.github_url)
+        contact_line = " · ".join(contact_parts) if contact_parts else ""
 
         user_content = f"""TARGET JOB
 Company: {company}
@@ -90,25 +101,28 @@ BASE RESUME (source of truth — never contradict or invent new experience):
 {base_resume[:8000]}
 ---
 
-Write the tailored resume in clean markdown. Structure:
-# Full Name
-*contact line: email · phone · city, state · linkedin · github*
+CRITICAL IDENTITY RULE: The candidate's name is **{p.full_name}**. You MUST use this exact name in the resume header. Never change, generalize, or replace it. The contact line is already filled in below — copy it verbatim.
+
+Write the tailored resume in clean markdown using this EXACT header (do not alter the name or contact line):
+
+# {p.full_name}
+{f'*{contact_line}*' if contact_line else ''}
 
 ## Summary
-<2-3 sentences, tailored to this role>
+<2-3 sentences tailored to this specific role — written in first person, referencing the company>
 
 ## Experience
-### Title — Company (dates)
-- Bullet
-- Bullet
+### [Exact Title from original] — [Company] ([start date] – [end date or Present])
+- Strongest, most relevant bullet first
+- Additional bullets as needed
 
 ## Education
-...
+[Keep exactly as in the base resume]
 
 ## Skills
-...
+[Reordered so the most relevant skills for this role appear first]
 
-Output ONLY the markdown resume. No explanation, no code fences.
+Output ONLY the markdown resume. No explanation, no code fences, no preamble.
 """
         log.info(
             "resume_writer.tailor_start",
