@@ -76,53 +76,94 @@ class ResumeWriter:
         base_resume = profile.profile.resume_raw_text or profile.to_context_string()
         p = profile.profile
 
-        # Build contact line from actual profile fields so Claude can't invent them
-        contact_parts = [x for x in [p.email, p.phone] if x]
+        # ── Pre-build the contact line so Claude cannot alter it ──────────
+        contact_parts: list[str] = []
+        if p.phone:
+            contact_parts.append(p.phone)
+        if p.email:
+            contact_parts.append(p.email)
         if p.city or p.state:
             contact_parts.append(", ".join(filter(None, [p.city, p.state])))
         if p.linkedin_url:
             contact_parts.append(p.linkedin_url)
         if p.github_url:
             contact_parts.append(p.github_url)
-        contact_line = " · ".join(contact_parts) if contact_parts else ""
+        if p.portfolio_url:
+            contact_parts.append(p.portfolio_url)
+        contact_line = " | ".join(contact_parts)
 
-        user_content = f"""TARGET JOB
-Company: {company}
-Title: {job_title}
+        user_content = f"""════════════════════════════════════════════════════
+TARGET JOB
+════════════════════════════════════════════════════
+Company : {company}
+Title   : {job_title}
 
-Job description:
+JOB DESCRIPTION:
 {job_description[:6000]}
 
-CANDIDATE PROFILE
+════════════════════════════════════════════════════
+CANDIDATE'S BASE RESUME  (source of truth — never contradict or invent)
+════════════════════════════════════════════════════
+{base_resume[:8000]}
+
+════════════════════════════════════════════════════
+ADDITIONAL PROFILE CONTEXT
+════════════════════════════════════════════════════
 {profile.to_context_string()}
 
-BASE RESUME (source of truth — never contradict or invent new experience):
+════════════════════════════════════════════════════
+OUTPUT INSTRUCTIONS
+════════════════════════════════════════════════════
+
+IDENTITY — NON-NEGOTIABLE:
+The candidate's name is: {p.full_name}
+Their contact line is  : {contact_line}
+You MUST reproduce both verbatim in the header. Do not change a single character.
+
+TAILORING TASK:
+1. Extract the top keywords from the job description (focus on the job title,
+   the Requirements section, and any term repeated 2+ times).
+2. Reframe existing bullets so the most JD-relevant work surfaces first.
+   Mirror the JD's exact terminology where accurate. Never fabricate.
+3. Cut bullets that have zero relevance to this role.
+4. Enforce ONE PAGE — trim least-relevant bullets before cutting sections.
+5. For this early-career candidate, put Education ABOVE Experience unless
+   they have 2+ years of directly relevant full-time experience.
+
+Produce the complete tailored resume in clean Markdown with this EXACT structure
+(copy the header below verbatim — do not change name or contact):
+
 ---
-{base_resume[:8000]}
----
-
-CRITICAL IDENTITY RULE: The candidate's name is **{p.full_name}**. You MUST use this exact name in the resume header. Never change, generalize, or replace it. The contact line is already filled in below — copy it verbatim.
-
-Write the tailored resume in clean markdown using this EXACT header (do not alter the name or contact line):
-
 # {p.full_name}
-{f'*{contact_line}*' if contact_line else ''}
+{contact_line}
 
 ## Summary
-<2-3 sentences tailored to this specific role — written in first person, referencing the company>
-
-## Experience
-### [Exact Title from original] — [Company] ([start date] – [end date or Present])
-- Strongest, most relevant bullet first
-- Additional bullets as needed
+[2-3 sentences: professional identity + 2-3 JD keywords + value you bring to {company}]
+[Do NOT start with "I". Do NOT use: motivated, passionate, hardworking, team player, fast learner]
 
 ## Education
-[Keep exactly as in the base resume]
+[Degree, Major — Institution (Month YYYY)]
+[GPA: X.X | Honours | Relevant Coursework: only if relevant to this role]
+
+## Experience
+### [Exact Job Title] — [Exact Company Name] (Month YYYY – Month YYYY)
+- [Action verb] + [what you did, in JD language] + [quantified outcome]
+- [Strongest, most relevant bullet first; 3-5 bullets per role]
+
+## Projects  ← omit this section entirely if no relevant projects
+### [Project Name] | [Tech Stack] (Month YYYY)
+- [Bullet]
 
 ## Skills
-[Reordered so the most relevant skills for this role appear first]
+[Category]: [tool1, tool2] | [Category]: [tool1, tool2]
+[Mirror JD tool names exactly; order most-relevant categories first]
 
-Output ONLY the markdown resume. No explanation, no code fences, no preamble.
+## Certifications  ← omit if none
+[Name — Issuing Body (Month YYYY)]
+---
+
+Output ONLY the Markdown resume between the --- delimiters above. No explanation,
+no preamble, no "here is your resume", no code fences around the output.
 """
         log.info(
             "resume_writer.tailor_start",
