@@ -202,7 +202,9 @@ class Pipeline:
 
         # Determine final status
         if mode == "shadow":
-            if fill_result.status == "shadow_complete":
+            if fill_result.status in ("shadow_complete", "needs_manual"):
+                # Both mean: form was navigated and work was attempted.
+                # Let the user see screenshots and decide, even if partial.
                 final_status = "shadow_review"
             elif fill_result.status == "skipped":
                 final_status = "skipped"

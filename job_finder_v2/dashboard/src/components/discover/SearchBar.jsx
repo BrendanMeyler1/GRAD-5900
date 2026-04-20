@@ -11,6 +11,7 @@ export default function SearchBar({ onSearch, isLoading = false }) {
   const [minFitScore, setMinFitScore] = useState(0);
   const [remoteOnly, setRemoteOnly] = useState(false);
 
+  // The <form onSubmit> already handles Enter natively — no onKeyDown needed.
   const handleSubmit = useCallback(
     (e) => {
       if (e) e.preventDefault();
@@ -26,13 +27,6 @@ export default function SearchBar({ onSearch, isLoading = false }) {
     [query, location, source, minFitScore, remoteOnly, onSearch, isLoading]
   );
 
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter") handleSubmit();
-    },
-    [handleSubmit]
-  );
-
   return (
     <div className="rounded-xl bg-slate-800 p-4">
       {/* Main search row */}
@@ -43,7 +37,6 @@ export default function SearchBar({ onSearch, isLoading = false }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
             placeholder="Python backend jobs..."
             className="w-full rounded-lg border border-slate-600 bg-slate-900 py-2.5 pl-10 pr-3 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
@@ -54,7 +47,6 @@ export default function SearchBar({ onSearch, isLoading = false }) {
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            onKeyDown={handleKeyDown}
             placeholder="Boston, MA"
             className="w-full rounded-lg border border-slate-600 bg-slate-900 py-2.5 px-3 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />

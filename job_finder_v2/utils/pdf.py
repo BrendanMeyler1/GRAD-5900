@@ -1,16 +1,17 @@
 """
-utils/pdf.py — Convert markdown resume text to a clean PDF file.
+utils/pdf.py — Convert markdown resume / cover letter to ATS-safe PDF files.
 
-The PDF is used in two ways:
-1. Uploaded to the "resume" file field on job application forms.
-2. Available for the user to download their tailored resume.
+Uses ReportLab (pure Python, no system libraries required) so it works on
+Windows, macOS, and Linux without installing GTK/Pango/Cairo.
 
-Uses weasyprint to render markdown → HTML → PDF. Output is ATS-friendly:
-clean single-column layout, no header/footer, no decorative images.
+Output format:
+- Single-column flow (no tables, no text boxes) — parses cleanly in every ATS
+- Helvetica for screen clarity; 10–10.5 pt body text
+- 0.75 in margins → comfortably fits one page of an early-career resume
 
 Usage:
-    from utils.pdf import markdown_to_pdf, export_resume_pdf
-    path = export_resume_pdf(app_id="abc123", resume_text="# Jane Smith\n...")
+    from utils.pdf import export_resume_pdf, export_cover_letter_pdf
+    pdf_path = export_resume_pdf(app_id="abc123", resume_text="# Jane Smith\\n...")
 """
 
 from __future__ import annotations
@@ -18,126 +19,269 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
-# Minimal CSS that produces a clean, ATS-safe PDF
-_RESUME_CSS = """
-@page {
-    size: letter;
-    margin: 0.75in 0.75in 0.75in 0.75in;
-}
-body {
-    font-family: "Times New Roman", Times, serif;
-    font-size: 11pt;
-    line-height: 1.4;
-    color: #000000;
-}
-h1 {
-    font-size: 16pt;
-    font-weight: bold;
-    margin-bottom: 2pt;
-    text-align: center;
-}
-h2 {
-    font-size: 12pt;
-    font-weight: bold;
-    margin-top: 10pt;
-    margin-bottom: 3pt;
-    border-bottom: 1px solid #000000;
-    padding-bottom: 1pt;
-    text-transform: uppercase;
-    letter-spacing: 0.5pt;
-}
-h3 {
-    font-size: 11pt;
-    font-weight: bold;
-    margin-top: 6pt;
-    margin-bottom: 1pt;
-}
-p {
-    margin: 2pt 0;
-}
-ul {
-    margin: 2pt 0 4pt 14pt;
-    padding: 0;
-}
-li {
-    margin-bottom: 1pt;
-}
-a {
-    color: #000000;
-    text-decoration: none;
-}
-.contact-line {
-    text-align: center;
-    font-size: 10pt;
-    color: #333333;
-    margin-bottom: 6pt;
-}
-hr {
-    border: none;
-    border-top: 0.5px solid #000000;
-    margin: 4pt 0;
-}
-"""
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Inline markdown → ReportLab XML conversion
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _html_escape(text: str) -> str:
+    """Escape the three characters that break ReportLab's XML parser."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _convert_inline(text: str) -> str:
+    """
+    Convert markdown inline syntax to ReportLab paragraph XML.
+
+    Handles: **bold**, *italic*, `code`, [link](url) → plain text.
+    Always HTML-escapes first to avoid XML parse errors from raw < > & in content.
+    """
+    text = _html_escape(text)
+    # Bold: **text** or __text__
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"__(.+?)__", r"<b>\1</b>", text)
+    # Italic: *text* or _text_ (single, not double)
+    text = re.sub(r"\*([^*]+?)\*", r"<i>\1</i>", text)
+    text = re.sub(r"_([^_]+?)_", r"<i>\1</i>", text)
+    # Inline code
+    text = re.sub(r"`([^`]+?)`", r'<font name="Courier">\1</font>', text)
+    # Markdown links → just the display text (ATS doesn't follow links anyway)
+    text = re.sub(r"\[([^\]]+?)\]\([^)]+?\)", r"\1", text)
+    return text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ReportLab style definitions
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_styles() -> dict[str, Any]:
+    """
+    Build all ParagraphStyles used in resume / cover-letter rendering.
+
+    Returns a dict keyed by name.  Imported lazily so the module can be
+    imported even when reportlab is not installed (the error surfaces at
+    call time, not import time).
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.styles import ParagraphStyle
+
+    return {
+        # ── Resume styles ──────────────────────────────────────────────────
+        "h1": ParagraphStyle(
+            "h1",
+            fontName="Helvetica-Bold",
+            fontSize=17,
+            leading=21,
+            alignment=TA_CENTER,
+            spaceBefore=0,
+            spaceAfter=2,
+        ),
+        "contact": ParagraphStyle(
+            "contact",
+            fontName="Helvetica",
+            fontSize=9,
+            leading=11,
+            alignment=TA_CENTER,
+            spaceBefore=0,
+            spaceAfter=5,
+            textColor=colors.HexColor("#333333"),
+        ),
+        "h2": ParagraphStyle(
+            "h2",
+            fontName="Helvetica-Bold",
+            fontSize=10.5,
+            leading=13,
+            alignment=TA_LEFT,
+            spaceBefore=7,
+            spaceAfter=1,
+            textColor=colors.black,
+        ),
+        "h3": ParagraphStyle(
+            "h3",
+            fontName="Helvetica-Bold",
+            fontSize=10.5,
+            leading=13,
+            alignment=TA_LEFT,
+            spaceBefore=4,
+            spaceAfter=1,
+        ),
+        "bullet": ParagraphStyle(
+            "bullet",
+            fontName="Helvetica",
+            fontSize=10,
+            leading=12,
+            leftIndent=10,
+            firstLineIndent=0,
+            spaceBefore=1,
+            spaceAfter=1,
+        ),
+        "normal": ParagraphStyle(
+            "normal",
+            fontName="Helvetica",
+            fontSize=10,
+            leading=12.5,
+            spaceBefore=2,
+            spaceAfter=2,
+        ),
+        # ── Cover letter styles ────────────────────────────────────────────
+        "cl_body": ParagraphStyle(
+            "cl_body",
+            fontName="Helvetica",
+            fontSize=11,
+            leading=15,
+            spaceBefore=0,
+            spaceAfter=10,
+        ),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Markdown → ReportLab story parser
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _md_to_story(markdown_text: str, styles: dict[str, Any]) -> list:
+    """
+    Parse a markdown resume into a list of ReportLab flowables (the "story").
+
+    Recognises:
+        # Name          → h1, centred
+        <contact line>  → contact style (centred, 9pt) — the first non-blank
+                          line that immediately follows a # heading
+        ## SECTION      → h2 + horizontal rule
+        ### Job Title   → h3
+        - bullet        → bullet paragraph with • prefix
+        --- / ===       → decorative separator, silently dropped
+        blank line      → small vertical spacer
+        everything else → normal paragraph
+    """
+    from reportlab.lib import colors
+    from reportlab.platypus import HRFlowable, Paragraph, Spacer
+
+    story: list = []
+    lines = markdown_text.splitlines()
+
+    # State: did we just see a # heading?  Next non-blank line is contact info.
+    after_h1 = False
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+
+        # ── H1 (name) ─────────────────────────────────────────────────────
+        if line.startswith("# "):
+            text = _convert_inline(line[2:].strip())
+            story.append(Paragraph(text, styles["h1"]))
+            after_h1 = True
+            continue
+
+        # ── H2 (section header) ───────────────────────────────────────────
+        if line.startswith("## "):
+            after_h1 = False
+            text = _convert_inline(line[3:].strip().upper())
+            story.append(Paragraph(text, styles["h2"]))
+            story.append(
+                HRFlowable(
+                    width="100%",
+                    thickness=0.5,
+                    color=colors.black,
+                    spaceAfter=2,
+                )
+            )
+            continue
+
+        # ── H3 (role / company) ───────────────────────────────────────────
+        if line.startswith("### "):
+            after_h1 = False
+            text = _convert_inline(line[4:].strip())
+            story.append(Paragraph(text, styles["h3"]))
+            continue
+
+        # ── Bullet ────────────────────────────────────────────────────────
+        if line.startswith("- ") or line.startswith("* "):
+            after_h1 = False
+            text = _convert_inline(line[2:].strip())
+            story.append(Paragraph(f"\u2022\u00a0{text}", styles["bullet"]))
+            continue
+
+        # ── Decorative separators — drop silently ─────────────────────────
+        if re.match(r"^-{3,}$", line) or re.match(r"^={3,}$", line):
+            continue
+
+        # ── Blank line ────────────────────────────────────────────────────
+        if line.strip() == "":
+            if not after_h1:
+                story.append(Spacer(1, 2))
+            continue
+
+        # ── Everything else ───────────────────────────────────────────────
+        text = _convert_inline(line.strip())
+        if not text:
+            continue
+
+        if after_h1:
+            # The line immediately after the candidate's name is the contact line
+            story.append(Paragraph(text, styles["contact"]))
+            after_h1 = False
+        else:
+            story.append(Paragraph(text, styles["normal"]))
+
+    return story
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public API
+# ─────────────────────────────────────────────────────────────────────────────
 
 def markdown_to_pdf(markdown_text: str, output_path: str | Path) -> str:
     """
-    Convert a markdown resume to a clean PDF.
+    Convert a Markdown document to a clean, ATS-safe PDF file.
 
     Args:
-        markdown_text: Resume content in Markdown format.
-        output_path: Where to write the PDF file. Parent dirs created if needed.
+        markdown_text: Resume or cover letter in Markdown format.
+        output_path:   Destination file path (parent dirs are created if absent).
 
     Returns:
-        Absolute path to the written PDF file.
+        Absolute path to the written PDF.
 
     Raises:
-        RuntimeError: If weasyprint or markdown are not installed.
-        IOError: If the output path cannot be written.
+        RuntimeError: If reportlab is not installed.
+        OSError:      If the output path cannot be written.
     """
     try:
-        import markdown as md_lib
-        from weasyprint import HTML, CSS
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate
     except ImportError as exc:
         raise RuntimeError(
-            "weasyprint and markdown are required for PDF generation. "
-            "Run: pip install weasyprint markdown"
+            "reportlab is required for PDF generation. "
+            "Install it with:  pip install reportlab"
         ) from exc
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert markdown → HTML
-    html_body = md_lib.markdown(
-        markdown_text,
-        extensions=["extra", "nl2br"],
-    )
-
-    # Wrap in minimal HTML document
-    full_html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<style>{_RESUME_CSS}</style>
-</head>
-<body>
-{html_body}
-</body>
-</html>"""
-
-    # Render to PDF
-    HTML(string=full_html).write_pdf(
+    doc = SimpleDocTemplate(
         str(output_path),
-        stylesheets=[CSS(string=_RESUME_CSS)],
+        pagesize=letter,
+        leftMargin=0.75 * inch,
+        rightMargin=0.75 * inch,
+        topMargin=0.65 * inch,
+        bottomMargin=0.65 * inch,
+        title="Resume",
+        author="",
     )
 
-    log.info(
-        "Generated resume PDF",
-        extra={"output": str(output_path), "size_kb": output_path.stat().st_size // 1024},
-    )
+    styles = _build_styles()
+    story = _md_to_story(markdown_text, styles)
+
+    doc.build(story)
+
+    size_kb = output_path.stat().st_size // 1024
+    log.info("pdf.generated", extra={"output": str(output_path), "size_kb": size_kb})
     return str(output_path.absolute())
 
 
@@ -147,17 +291,17 @@ def export_resume_pdf(
     generated_dir: str = "./data/generated",
 ) -> str:
     """
-    Export a tailored resume as PDF for a specific application.
+    Export a tailored resume as a PDF for a specific application.
 
-    Creates the file at: {generated_dir}/{app_id}/resume.pdf
+    Writes to: {generated_dir}/{app_id}/resume.pdf
 
     Args:
-        app_id: Application ID (used for directory naming).
-        resume_text: Tailored resume in markdown format.
-        generated_dir: Base directory for generated files.
+        app_id:        Application ID (used as sub-directory name).
+        resume_text:   Tailored resume in Markdown format.
+        generated_dir: Base directory for generated artefacts.
 
     Returns:
-        Absolute path to the PDF file.
+        Absolute path to the written PDF.
     """
     output_path = Path(generated_dir) / app_id / "resume.pdf"
     return markdown_to_pdf(resume_text, output_path)
@@ -169,20 +313,23 @@ def export_cover_letter_pdf(
     generated_dir: str = "./data/generated",
 ) -> str:
     """
-    Export a cover letter as PDF for a specific application.
+    Export a cover letter as a PDF for a specific application.
 
-    Creates the file at: {generated_dir}/{app_id}/cover_letter.pdf
+    Writes to: {generated_dir}/{app_id}/cover_letter.pdf
+
+    Plain-text paragraphs are wrapped in minimal Markdown so the shared
+    renderer produces clean paragraph spacing.
 
     Args:
-        app_id: Application ID.
-        cover_letter_text: Cover letter as plain text or markdown.
-        generated_dir: Base directory for generated files.
+        app_id:             Application ID.
+        cover_letter_text:  Cover letter as plain text or light Markdown.
+        generated_dir:      Base directory for generated artefacts.
 
     Returns:
-        Absolute path to the PDF file.
+        Absolute path to the written PDF.
     """
-    # Wrap plain text as minimal markdown for consistent rendering
-    if not cover_letter_text.startswith("#"):
+    # If the text isn't already Markdown, preserve paragraph breaks.
+    if not cover_letter_text.lstrip().startswith("#"):
         formatted = "\n\n".join(
             p.strip() for p in cover_letter_text.split("\n\n") if p.strip()
         )

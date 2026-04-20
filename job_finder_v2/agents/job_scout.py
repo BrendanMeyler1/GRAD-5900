@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from db.store import FullProfile, JobListing as DBJobListing, Store
-from llm.client import LLMClient, load_prompt
+from llm.client import FAST_MODEL, LLMClient, load_prompt
 from scrapers import GreenhouseScraper, JSearchScraper, JobListing, LeverScraper
 
 log = logging.getLogger(__name__)
@@ -89,11 +89,14 @@ class JobScout:
             extra={"unique": len(listings), "query": query},
         )
 
-        # Score concurrently (cap to avoid rate limits)
-        sem = asyncio.Semaphore(5)
+        # Score concurrently. Cap at 3 to stay well under Anthropic's rate limit.
+        # Each call uses Haiku (faster + separate quota from Opus).
+        sem = asyncio.Semaphore(3)
 
         async def score_one(listing: JobListing) -> ScoredJob | None:
             async with sem:
+                # Small per-slot jitter so all 3 slots don't fire simultaneously
+                await asyncio.sleep(0.15)
                 return await self._score_fit(listing, profile)
 
         scored_results = await asyncio.gather(
@@ -194,10 +197,13 @@ Description:
 Score this match. Return only the JSON object described in your instructions.
 """
         try:
+            # Use Haiku for scoring: 10× cheaper, much higher rate limit, plenty smart
+            # enough for JSON fit assessment.
             raw = await self.llm.chat(
                 messages=[{"role": "user", "content": user_content}],
                 system=self._fit_prompt,
-                max_tokens=1000,
+                max_tokens=600,
+                model=FAST_MODEL,
             )
         except Exception as exc:  # noqa: BLE001
             log.warning(

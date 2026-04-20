@@ -44,11 +44,18 @@ export default function JobDetail({ job }) {
   const handleShadowApply = async () => {
     try {
       const result = await shadowApply.mutateAsync(job.id);
-      setAppliedId(result?.application_id || job.id);
-      addToast({
-        message: "Shadow application created! Review it in the Apply tab.",
-        type: "success",
-      });
+      if (result?.already_running) {
+        addToast({
+          message: result.message || "Shadow application already in progress. Check the Apply tab.",
+          type: "info",
+        });
+      } else {
+        setAppliedId(result?.application_id || job.id);
+        addToast({
+          message: "Shadow application started! It'll appear in the Apply tab shortly.",
+          type: "success",
+        });
+      }
     } catch (err) {
       addToast({
         message: err?.message || "Shadow apply failed. Please try again.",

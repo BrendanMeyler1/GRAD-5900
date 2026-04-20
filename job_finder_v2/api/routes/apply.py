@@ -65,6 +65,22 @@ async def start_shadow(
             },
         )
 
+    # Guard: don't start a duplicate shadow run if one is already in progress or ready for review
+    all_apps = store.list_applications()
+    for existing in all_apps:
+        if existing.job_id == job_id and existing.status in {
+            "shadow_running",
+            "shadow_review",
+            "submitting",
+        }:
+            return {
+                "task_id": "",
+                "job_id": job_id,
+                "message": f"Shadow application already {existing.status} (app_id={existing.id}). Review it in the Apply tab.",
+                "app_id": existing.id,
+                "already_running": True,
+            }
+
     task_id = await registry.create(f"Shadow apply: {job.company} — {job.title}")
 
     async def _run() -> None:
@@ -179,8 +195,9 @@ async def list_screenshots(
     urls: list[str] = []
     for path_str in app.shadow_screenshots:
         p = Path(path_str)
-        # Surface the filename — static mount serves the screenshots directory
-        urls.append(f"/static/screenshots/{p.name}")
+        # Screenshots are stored in {screenshots_dir}/{app_id}/step_XX.png
+        # Static mount serves {screenshots_dir}, so URL needs {app_id}/{filename}
+        urls.append(f"/static/screenshots/{app_id}/{p.name}")
     return {"screenshots": urls, "count": len(urls)}
 
 
@@ -199,7 +216,9 @@ async def get_screenshot(
     target = None
     for path_str in app.shadow_screenshots:
         p = Path(path_str)
-        if p.name == name:
+        # Match by app_id/filename (e.g. "abc123/step_01.png") or just filename
+        rel = f"{app_id}/{p.name}"
+        if p.name == name or rel == name:
             target = p
             break
     if target is None or not target.exists():

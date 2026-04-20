@@ -198,6 +198,7 @@ class JobFilters(BaseModel):
     source: str | None = None
     min_fit_score: float | None = None
     remote_only: bool = False
+    title_query: str | None = None  # LIKE filter on title + company
     limit: int = 50
     offset: int = 0
     sort_by: str = "created_at"  # 'created_at'|'fit_score'|'posted_at'
@@ -562,6 +563,11 @@ class Store:
             params.append(f.min_fit_score)
         if f.remote_only:
             conditions.append("remote_ok = 1")
+        if f.title_query:
+            # Match title OR company, case-insensitive (SQLite LIKE is case-insensitive for ASCII)
+            conditions.append("(title LIKE ? OR company LIKE ?)")
+            term = f"%{f.title_query}%"
+            params.extend([term, term])
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         order = f.sort_by if f.sort_by in {"created_at", "fit_score", "posted_at"} else "created_at"
@@ -707,6 +713,41 @@ class Store:
         )
         self._get_conn().commit()
         return self.get_application(app_id)  # type: ignore[return-value]
+
+    def delete_application(self, app_id: str) -> bool:
+        """
+        Hard-delete a single application record.
+
+        Args:
+            app_id: Application ID to remove.
+
+        Returns:
+            True if a row was deleted, False if not found.
+        """
+        cur = self._get_conn().execute(
+            "DELETE FROM applications WHERE id = ?", (app_id,)
+        )
+        self._get_conn().commit()
+        return cur.rowcount > 0
+
+    def delete_applications_by_statuses(self, statuses: list[str]) -> int:
+        """
+        Hard-delete all applications whose status is in *statuses*.
+
+        Args:
+            statuses: List of status strings (e.g. ["shadow_review", "failed"]).
+
+        Returns:
+            Number of rows deleted.
+        """
+        if not statuses:
+            return 0
+        placeholders = ",".join("?" * len(statuses))
+        cur = self._get_conn().execute(
+            f"DELETE FROM applications WHERE status IN ({placeholders})", statuses
+        )
+        self._get_conn().commit()
+        return cur.rowcount
 
     def _row_to_app(self, row: sqlite3.Row) -> Application:
         d = _row_to_dict(row)

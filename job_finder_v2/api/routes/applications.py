@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.dependencies import get_store
@@ -93,3 +93,40 @@ async def update_application(
     updated = store.update_application(app_id, **fields)
     log.info("applications.updated", extra={"app_id": app_id, "fields": list(fields.keys())})
     return updated
+
+
+@router.delete(
+    "",
+    summary="Bulk-delete applications by status",
+    description=(
+        "Hard-delete all applications whose status matches any of the provided "
+        "`status` query params. Repeat the param to clear multiple columns at once "
+        "(e.g. `?status=shadow_review&status=failed`). "
+        "Returns the number of records removed."
+    ),
+)
+async def bulk_delete_applications(
+    status: list[str] = Query(default=[]),
+    store: Store = Depends(get_store),
+) -> dict[str, int]:
+    """Remove all applications with the given status(es) — used by the 'Clear all' button."""
+    count = store.delete_applications_by_statuses(status)
+    log.info("applications.bulk_deleted", extra={"statuses": status, "count": count})
+    return {"deleted": count}
+
+
+@router.delete(
+    "/{app_id}",
+    summary="Delete a single application",
+    description="Hard-delete one application record. Used by the per-card × dismiss button.",
+)
+async def delete_application(
+    app_id: str,
+    store: Store = Depends(get_store),
+) -> dict[str, str | bool]:
+    """Remove a single application. Irreversible."""
+    deleted = store.delete_application(app_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail={"error": "application_not_found"})
+    log.info("applications.deleted", extra={"app_id": app_id})
+    return {"deleted": True, "app_id": app_id}

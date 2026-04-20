@@ -10,6 +10,7 @@ function buildJobsUrl(filters) {
     if (filters.source) params.set("source", filters.source);
     if (filters.min_fit_score != null) params.set("min_fit_score", String(filters.min_fit_score));
     if (filters.remote_only) params.set("remote_only", "true");
+    if (filters.title_query) params.set("title_query", filters.title_query);
     if (filters.sort_by) params.set("sort_by", filters.sort_by);
   }
   const qs = params.toString();

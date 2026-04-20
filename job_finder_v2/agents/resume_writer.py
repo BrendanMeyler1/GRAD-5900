@@ -187,7 +187,8 @@ no preamble, no "here is your resume", no code fences around the output.
                 app_id=app_id, resume_text=text, generated_dir=settings.generated_dir
             )
         except Exception as exc:  # noqa: BLE001 — PDF is not critical path
-            log.warning(
+            # log.exception prints the full traceback so you can see the real cause
+            log.exception(
                 "resume_writer.pdf_failed",
                 extra={"app_id": app_id, "error": str(exc)},
             )
@@ -254,7 +255,7 @@ Write the cover letter in the voice of the candidate. Output ONLY the letter bod
                 generated_dir=settings.generated_dir,
             )
         except Exception as exc:  # noqa: BLE001
-            log.warning(
+            log.exception(
                 "resume_writer.cover_pdf_failed",
                 extra={"app_id": app_id, "error": str(exc)},
             )

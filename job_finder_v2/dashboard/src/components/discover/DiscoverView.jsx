@@ -19,6 +19,7 @@ export default function DiscoverView() {
     source: null,
     min_fit_score: null,
     remote_only: false,
+    title_query: null,
   });
 
   const queryClient = useQueryClient();
@@ -54,9 +55,12 @@ export default function DiscoverView() {
       } catch (err) {
         console.error("Search failed:", err);
       }
-      // Apply any filters that came alongside the search
+      // Scope the list to this search's keywords and sort newest-first so
+      // freshly-scraped results surface above older seeded/cached jobs.
       setActiveFilters((prev) => ({
         ...prev,
+        title_query: query || null,
+        sort_by: "created_at",
         ...(source ? { source: source.toLowerCase() } : {}),
         ...(min_fit_score != null ? { min_fit_score } : {}),
         ...(remote_only != null ? { remote_only } : {}),

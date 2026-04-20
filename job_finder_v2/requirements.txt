@@ -25,8 +25,7 @@ lxml>=5.3.0                     # faster BS4 parser
 # Resume parsing & document generation
 pypdf>=4.0.0                    # extract text from uploaded PDF resumes
 python-docx>=1.1.0              # extract text from uploaded DOCX resumes
-markdown>=3.7                   # parse tailored resume markdown before PDF conversion
-weasyprint>=62.0                # render markdown → PDF for form uploads
+reportlab>=4.2.0                # render markdown → PDF (pure Python, no system deps)
 
 # Database & encryption
 cryptography>=43.0.0            # Fernet encryption for PII fields
