@@ -14,7 +14,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --basetemp=tests/.tmp"
 filterwarnings = [
     "ignore::DeprecationWarning:pydantic",
     "ignore::DeprecationWarning:stagehand",

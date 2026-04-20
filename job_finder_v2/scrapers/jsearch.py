@@ -46,8 +46,12 @@ class JSearchScraper(BaseScraper):
 
     source = "jsearch"
 
-    def __init__(self, api_key: str | None = None, timeout: float = 30.0) -> None:
-        self.api_key = api_key or settings.jsearch_api_key
+    _UNSET: object = object()  # sentinel to distinguish "not provided" from explicit None
+
+    def __init__(self, api_key: str | None = _UNSET, timeout: float = 30.0) -> None:  # type: ignore[assignment]
+        # Only fall back to settings when no argument was passed at all.
+        # Explicitly passing api_key=None means "no key" (useful in tests).
+        self.api_key = api_key if api_key is not JSearchScraper._UNSET else settings.jsearch_api_key
         self._client = httpx.AsyncClient(
             timeout=timeout,
             headers={
